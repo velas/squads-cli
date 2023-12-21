@@ -1,9 +1,8 @@
-import axios from "axios";
 import Squads, { getTxPDA, getAuthorityPDA } from "@sqds/sdk";
 import * as anchor from "@coral-xyz/anchor";
 import BN from "bn.js";
-import { getProgramData, upgradeSetAuthorityIx } from "./program.js";
-import { getAssets } from "./assets.js";
+import { getProgramData, upgradeSetAuthorityIx } from "./program";
+import { getAssets } from "./assets";
 import {getAssociatedTokenAddress,createAssociatedTokenAccountInstruction} from "@solana/spl-token";
 import {idl} from "../info";
 import { ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";

@@ -1,6 +1,6 @@
 import {NodeWallet, programs} from "@metaplex/js";
 import {TOKEN_PROGRAM_ID} from '@solana/spl-token';
-import {getMultipleAccountsBatch, shortenTextEnd} from "./utils.js";
+import {getMultipleAccountsBatch, shortenTextEnd} from "./utils";
 import axios from "axios";
 import {utils} from "@coral-xyz/anchor";
 import CLI from "clui";
@@ -20,7 +20,7 @@ import {
     UnparsedMaybeAccount, walletAdapterIdentity
 } from "@metaplex-foundation/js";
 import * as fs from "fs";
-import { METAPLEX_PROGRAM_ID, updateMetadataAuthorityIx } from "./metadataInstructions.js";
+import { METAPLEX_PROGRAM_ID, updateMetadataAuthorityIx } from "./metadataInstructions";
 import {TokenStandard} from '@metaplex-foundation/mpl-token-metadata';
 
 import Squads from "@sqds/sdk";

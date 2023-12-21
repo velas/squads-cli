@@ -43,11 +43,11 @@ import {
     nftUpdateTryFailuresInq,
     nftMintListInq,
     nftTransferDestinationInq,
-} from "./inq/index.js";
+} from "./inq/index";
 
-import API from "./api.js";
+import API from "./api";
 
-import { shortenTextEnd } from './utils.js';
+import { shortenTextEnd } from './utils';
 import {
     checkAllMetas,
     checkAllMetasAuthority,
@@ -58,8 +58,8 @@ import {
     loadNFTMints,
     prepareBulkUpdate,
     sendTxMetaIx
-} from './nfts.js';
-import { updateMetadataAuthorityIx } from './metadataInstructions.js';
+} from './nfts';
+import { updateMetadataAuthorityIx } from './metadataInstructions';
 import {nftWithdrawConfirmInq} from "./inq/nftMenu";
 import {validatorMainInq, validatorWithdrawAuthDestPrompt, validatorWithdrawAuthPrompt} from "./inq/validatorMenu";
 

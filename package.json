@@ -1,26 +1,36 @@
 {
-  "name": "@sqds/cli",
-  "version": "2.3.17",
-  "description": "",
-  "main": "bin/index.js",
+  "name": "@velas/multisig-cli",
+  "version": "0.6.3",
+  "main": "src/index.js",
   "scripts": {
-    "serve": "tsc && node .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "serve": "ts-node ./src/index.ts"
   },
   "author": {
-    "name": "Sean Ganser",
-    "email": "sean.ganser@gmail.com",
-    "url": "https://github.com/ogmedia"
+    "name": "Maksim Vykhota",
+    "email": "m.vykhota@protonmail.com",
+    "url": "https://github.com/Tirka100"
   },
+  "contributors": [
+    {
+      "name": "Sean Ganser",
+      "email": "sean.ganser@gmail.com",
+      "url": "https://github.com/ogmedia"
+    },
+    {
+      "name": "Maksim Vykhota",
+      "email": "m.vykhota@protonmail.com",
+      "url": "https://github.com/Tirka100"
+    }
+  ],
   "keywords": [
-    "solana",
+    "velas",
     "multisig",
     "cli",
     "smart contract"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/squads-protocol/squads-cli"
+    "url": "https://github.com/velas/squads-cli"
   },
   "license": "AGPL-3.0-or-later",
   "dependencies": {
@@ -62,19 +72,19 @@
     "simple-git": "^3.10.0",
     "touch": "^3.1.0",
     "tslib": "^2.5.0",
-    "typescript": "^4.9.5",
+    "typescript": "^5.3.3",
     "yargs": "^17.6.2"
   },
   "bin": {
     "squads-cli": "./bin/index.js"
   },
   "engines": {
-    "npm": ">=8.19.2",
-    "node": ">=16.0.0"
+    "npm": ">=10",
+    "node": ">=20"
   },
   "devDependencies": {
     "@types/inquirer": "^9.0.3",
-    "@types/node": "^18.14.6",
+    "@types/node": "^20.10.5",
     "@types/yargs": "^17.0.22",
     "ts-node": "^10.9.1"
   },

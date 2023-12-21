@@ -2,7 +2,7 @@
     "compilerOptions": {
       "outDir": "./bin",
       "allowJs": true,
-      "target": "es5",
+      "target": "es6",
       "rootDir": "src",
       "esModuleInterop": true,
       "skipLibCheck": true,
