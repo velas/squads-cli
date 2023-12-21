@@ -8,8 +8,7 @@ import "console.table";
 import * as fs from 'fs';
 import path from 'path';
 
-import { getAuthorityPDA, DEFAULT_MULTISIG_PROGRAM_ID, DEFAULT_PROGRAM_MANAGER_PROGRAM_ID, getIxPDA } from '@sqds/sdk';
-import { TXMETA_PROGRAM_ID } from './constants.js';
+import { getAuthorityPDA, getIxPDA } from '@sqds/sdk';
 import BN from 'bn.js';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import {
@@ -76,12 +75,12 @@ class Menu{
     api;
     connection;
     walletBalance: number = 0;
-    constructor(wallet: any, connection: any, programId?: string, programManagerId?: string, txMetaProgramId?: string) {
+    constructor(wallet: any, connection: any, programId: string, programManagerId: string, txMetaProgramId: string) {
         this.wallet = wallet.wallet;
         this.connection = connection;
-        this.programId = programId ? new PublicKey(programId) : DEFAULT_MULTISIG_PROGRAM_ID;
-        this.programManagerId = programManagerId ? new PublicKey(programManagerId) : DEFAULT_PROGRAM_MANAGER_PROGRAM_ID;
-        this.txMetaProgramId = txMetaProgramId ? new PublicKey(txMetaProgramId) : new PublicKey(TXMETA_PROGRAM_ID);
+        this.programId = new PublicKey(programId);
+        this.programManagerId = new PublicKey(programManagerId);
+        this.txMetaProgramId = new PublicKey(txMetaProgramId);
         this.api = new API(wallet.wallet, connection, this.programId, this.programManagerId);
         this.api.getWalletBalance(async (balance) => {
             this.walletBalance = balance;

@@ -3,7 +3,7 @@ import {web3} from "@coral-xyz/anchor";
 class CliConnection {
     connection;
     cluster;
-    constructor(hostUrl?: string | undefined){
+    constructor(hostUrl?: string){
         let cluster;
         if (hostUrl === "localnet"){
             cluster = "http://127.0.0.1:8899";
@@ -11,7 +11,7 @@ class CliConnection {
         else if (hostUrl === "devnet"){
             cluster = "https://api.devnet.velas.com";
         }
-        else if (hostUrl === null || hostUrl === "mainnet" || hostUrl === "mainnet-beta"){
+        else if (hostUrl == null || hostUrl === "mainnet" || hostUrl === "mainnet-beta"){
             cluster = "https://api.mainnet.velas.com";
         }
         else if (hostUrl === ""){
