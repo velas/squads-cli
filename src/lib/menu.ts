@@ -11,7 +11,7 @@ import path from 'path';
 import { getAuthorityPDA, DEFAULT_MULTISIG_PROGRAM_ID, DEFAULT_PROGRAM_MANAGER_PROGRAM_ID, getIxPDA } from '@sqds/sdk';
 import { TXMETA_PROGRAM_ID } from './constants.js';
 import BN from 'bn.js';
-import {ComputeBudgetProgram, PublicKey, Transaction} from '@solana/web3.js';
+import { PublicKey, Transaction } from '@solana/web3.js';
 import {
     mainMenu,
     viewMultisigsMenu,
@@ -357,10 +357,6 @@ class Menu{
                 const status = new Spinner("Executing transaction...");
                 status.start();
                 let successfullyExecuted = 0;
-                const additionalComputeBudgetInstruction =
-                    ComputeBudgetProgram.setComputeUnitLimit({
-                        units: 1400000,
-                    })
                 try {
                     if(tx.instructionIndex > 3) {
                         for (let ixIndex = tx.executedIndex + 1; ixIndex <= tx.instructionIndex; ixIndex++){
@@ -370,7 +366,7 @@ class Menu{
                                 const ix = await this.api.executeInstructionBuilder(tx.publicKey, ixPDA);
                                 const {blockhash, lastValidBlockHeight} = await this.api.connection.getLatestBlockhash();
                                 const executeIxTx = new Transaction({lastValidBlockHeight, blockhash, feePayer: this.wallet.publicKey});
-                                executeIxTx.add(additionalComputeBudgetInstruction,ix);
+                                executeIxTx.add(ix);
                                 const signed = await this.wallet.signTransaction(executeIxTx);
                                 const txid = await this.api.connection.sendRawTransaction(signed.serialize(), {skipPreflight: true});
                                 await this.api.connection.confirmTransaction(txid, "confirmed");
@@ -381,7 +377,7 @@ class Menu{
                                 const ix = await this.api.executeInstructionBuilder(tx.publicKey, ixPDA);
                                 const {blockhash, lastValidBlockHeight} = await this.api.connection.getLatestBlockhash();
                                 const executeIxTx = new Transaction({lastValidBlockHeight, blockhash, feePayer: this.wallet.publicKey});
-                                executeIxTx.add(additionalComputeBudgetInstruction,ix);
+                                executeIxTx.add(ix);
                                 const signed = await this.wallet.signTransaction(executeIxTx);
                                 const txid = await this.api.connection.sendRawTransaction(signed.serialize(), {skipPreflight: true});
                                 await this.api.connection.confirmTransaction(txid, "confirmed");
@@ -393,7 +389,7 @@ class Menu{
                         const ix = await this.api.executeTransactionBuilder(tx.publicKey);
                         const {blockhash, lastValidBlockHeight} = await this.api.connection.getLatestBlockhash();
                         const executeTx = new Transaction({lastValidBlockHeight, blockhash, feePayer: this.wallet.publicKey});
-                        executeTx.add(additionalComputeBudgetInstruction,ix);
+                        executeTx.add(ix);
                         const signed = await this.wallet.signTransaction(executeTx);
                         const txid = await this.api.connection.sendRawTransaction(signed.serialize());
                         await this.api.connection.confirmTransaction(txid, "processed");
