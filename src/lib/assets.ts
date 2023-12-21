@@ -19,7 +19,7 @@ export const getAssets = async (connection: Connection, userKey: PublicKey) => {
         amount: solInfo / LAMPORTS_PER_SOL,
         source: userKey.toBase58(),
         mint: "So11111111111111111111111111111111111111112",
-        symbol: 'SOL',
+        symbol: 'SOL', // -> VLX?
         decimals: 9,
         name: "Solana"
     }

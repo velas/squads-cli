@@ -1,4 +1,4 @@
-import Squads, { getTxPDA, getAuthorityPDA } from "@sqds/sdk";
+import Squads, { getTxPDA, getAuthorityPDA, MultisigAccount } from "@sqds/sdk";
 import * as anchor from "@coral-xyz/anchor";
 import BN from "bn.js";
 import { getProgramData, upgradeSetAuthorityIx } from "./program";
@@ -7,16 +7,16 @@ import {getAssociatedTokenAddress,createAssociatedTokenAccountInstruction} from 
 import {idl} from "../info";
 import { ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { Wallet } from "@coral-xyz/anchor";
+import { Program, ProgramAccount, Wallet } from "@coral-xyz/anchor";
 import {Connection, LAMPORTS_PER_SOL, PublicKey, VoteProgram} from "@solana/web3.js";
 
 class API{
-    squads;
+    squads: Squads;
     wallet;
     connection: Connection;
     cluster;
     programId: PublicKey;
-    program;
+    program: Program;
     provider;
     programManagerId: PublicKey;
     constructor(wallet: Wallet, connection: any, programId: PublicKey, programManagerId: PublicKey){
@@ -30,14 +30,14 @@ class API{
         this.program = new anchor.Program(idl as anchor.Idl, this.programId, this.provider);
     }
 
-    getSquadExtended = async (ms: PublicKey) => {
+    getSquadExtended = async (ms: PublicKey): Promise<MultisigAccount> => {
         return this.squads.getMultisig(ms);
     };
     
-    getSquads = async (pubkey: PublicKey) => {
-        const allSquads = await this.program.account.ms.all();
-        const mySquads = allSquads.filter((s:any) => {
-            const mappedKeys = s.account.keys.map((k: PublicKey) => k.toBase58());
+    getSquads = async (pubkey: PublicKey): Promise<MultisigAccount[]> => {
+        const allSquads: ProgramAccount<any>[] = await this.program.account.ms.all()
+        const mySquads = allSquads.filter((s) => {
+            const mappedKeys: string[] = s.account.keys.map((k: PublicKey) => k.toBase58());
             if (mappedKeys.indexOf(this.wallet.publicKey.toBase58()) >= 0){
                 return true;
             }

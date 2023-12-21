@@ -8,7 +8,7 @@ import "console.table";
 import * as fs from 'fs';
 import path from 'path';
 
-import { getAuthorityPDA, getIxPDA } from '@sqds/sdk';
+import { MultisigAccount, getAuthorityPDA, getIxPDA } from '@sqds/sdk';
 import BN from 'bn.js';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import {
@@ -70,9 +70,9 @@ class Menu{
     programId: PublicKey;
     programManagerId: PublicKey;
     txMetaProgramId: PublicKey;
-    multisigs: any[] = [];
+    multisigs: MultisigAccount[] = [];
     wallet;
-    api;
+    api: API;
     connection;
     walletBalance: number = 0;
     constructor(wallet: any, connection: any, programId: string, programManagerId: string, txMetaProgramId: string) {
@@ -108,7 +108,7 @@ class Menu{
                 figlet.textSync('SQUADS', { font: "Slant", horizontalLayout: 'full' })
             )
         );
-        console.log( chalk.blue("Connected wallet: ") + chalk.white(this.wallet.publicKey.toBase58()) + ( this.walletBalance > 0 ? ( chalk.blue(" (") + chalk.white(this.walletBalance) + chalk.blue(" SOL)") ) : "" ));
+        console.log( chalk.blue("Connected wallet: ") + chalk.white(this.wallet.publicKey.toBase58()) + ( this.walletBalance > 0 ? ( chalk.blue(" (") + chalk.white(this.walletBalance) + chalk.blue(" VLX)") ) : "" ));
         if(vault){
             try {
                 console.log( chalk.blue("Vault address: ") + chalk.white(vault.toBase58()));
@@ -120,7 +120,7 @@ class Menu{
     }
 
     multisigList = async () => {
-        const loadAuthorities = async (ms: any[]) => {
+        const loadAuthorities = async (ms: MultisigAccount[]) => {
             return Promise.all(ms.map(async (msObj,i) => {
                 const [mAuth] = await getAuthorityPDA(msObj.publicKey, new BN(1), this.api.programId);
                 return {
@@ -157,7 +157,7 @@ class Menu{
         }
     };
 
-    multisig = async (ms: any) => {
+    multisig = async (ms: MultisigAccount) => {
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
         console.log("Info");
@@ -205,7 +205,7 @@ class Menu{
         }
     };
 
-    transactions = async (txs: any[], ms: any) => {
+    transactions = async (txs: any[], ms: MultisigAccount) => {
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
         const {action} = await transactionsMenu(txs, this.wallet.publicKey);
@@ -218,16 +218,54 @@ class Menu{
         }
     };
 
-    createTransaction = async (ms: any) => {
-        const {assemble} = await inquirer.prompt({
+    createTransaction = async (ms: MultisigAccount) => {
+        // const TRANSFER_WITHDRAW_AUTHORITY = "Authorize current Vault to withdraw Stake"
+        const WITHDRAW_STAKE = "Create withdraw Stake transaction"
+        const ENTER_RAW_TX = "Enter Arbitraty Transaction (base58 serialized message)"
+        const ASSEMBLE_DRAFT_TX = "Assemble Transaction (create draft)"
+        const GO_BACK = "<- Go back"
+
+        const { assemble } = await inquirer.prompt({
             default: "",
             name: 'assemble',
             type: 'list',
-            choices: ["Enter Transaction (base58 serialized message)", "Assemble Transaction (create draft)", "<- Go back"],
+            choices: [WITHDRAW_STAKE, ENTER_RAW_TX, ASSEMBLE_DRAFT_TX, GO_BACK],
             message: 'How do you want to create the transaction?',
         });
 
-        if(assemble.indexOf("Assemble") == 0){
+        if (assemble === WITHDRAW_STAKE) {
+
+
+
+            let printable: any = ms
+            printable.publicKey = ms.publicKey.toBase58()
+            printable.createKey = ms.createKey.toBase58()
+            printable.keys = printable.keys.map(k => k.toBase58())
+            console.log(printable)
+            // {
+            //   threshold: 1,
+            //   authorityIndex: 1,
+            //   transactionIndex: 3,
+            //   msChangeIndex: 0,
+            //   bump: 255,
+            //   createKey: 'AefyJ2dRBiNvX4j5fUuDjjLHBadNojCm6SDmMU1BxTSX',
+            //   allowExternalExecute: false,
+            //   keys: [ '88zkBGE7turbMwQew3GAtNK9JmnrE7t6mggSqtBgFyAt' ],
+            //   publicKey: 'ELgNUZPYdQQqAW6ZPwJtiGR4pEETMAsA6MMito1Cpx58'
+            // }
+
+            const [vaultPDA] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
+            const vault = await this.api.getVaultAssets(vaultPDA);
+
+            console.log("Vault PDA: " + vaultPDA.toBase58())
+            console.log("Vault: ")
+            console.log(vault)
+
+
+
+            const {yes} = await basicConfirm("Continue?", false);
+            this.multisig(ms);
+        } else if(assemble === ENTER_RAW_TX){
             const {authority} = await createTransactionInq();
             const authorityBN = new BN(authority, 10);
             const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId);
@@ -247,7 +285,7 @@ class Menu{
             }else {
                 this.multisig(ms);
             }
-        }else if(assemble.indexOf("Enter") == 0) {
+        }else if(assemble === ASSEMBLE_DRAFT_TX) {
             const {authority} = await createTransactionInq();
             const authorityBN = new BN(authority, 10);
             const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId);
@@ -304,7 +342,7 @@ class Menu{
         }
     };
 
-    transaction = async (tx: any, ms: any, txs: any[]) => {
+    transaction = async (tx: any, ms: MultisigAccount, txs: any[]) => {
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
         const [authority] = await getAuthorityPDA(ms.publicKey, new BN(tx.authorityIndex,10), this.api.programId);
@@ -525,7 +563,7 @@ class Menu{
         }
     };
 
-    vault = async (ms: any, vaultPDA: PublicKey, vd: any) => {
+    vault = async (ms: MultisigAccount, vaultPDA: PublicKey, vd: any) => {
         this.header();
         console.log("Vault Address: " + chalk.blue(vaultPDA.toBase58()));
         console.table(vd.displayTokens);
@@ -533,11 +571,11 @@ class Menu{
         this.multisig(ms);
     }
 
-    useAsset = async (ms: any, asset: any) => {
+    useAsset = async (ms: MultisigAccount, asset: any) => {
         this.header();
     }
 
-    settings = async (ms: any) => {
+    settings = async (ms: MultisigAccount) => {
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1,10), this.api.programId);
         this.header(vault);
         const owners = ms.keys.map((m: PublicKey) => {
@@ -561,7 +599,7 @@ class Menu{
         }
     }
 
-    addKey = async (ms: any) => {
+    addKey = async (ms: MultisigAccount) => {
         const {memberKey} = await inquirer.prompt({default: "", name: 'memberKey', type: 'input', message: `Enter the public key of the member you want to add (base58):`});
         if (memberKey === "") {
             this.settings(ms);
@@ -590,7 +628,7 @@ class Menu{
         }
     };
 
-    removeKey = async (ms: any) => {
+    removeKey = async (ms: MultisigAccount) => {
         this.header();
         const choices = ms.keys.map((k: PublicKey) => k.toBase58());
         choices.push("<- Go back");
@@ -621,7 +659,7 @@ class Menu{
         }
     };
 
-    changeThreshold = async (ms: any) => {
+    changeThreshold = async (ms: MultisigAccount) => {
         this.header();
         const choices = ms.keys.map((k: PublicKey) => k.toBase58());
         choices.push("<- Go back");
@@ -676,7 +714,7 @@ class Menu{
         }
     }
 
-    program = async (ms: any) => {
+    program = async (ms: MultisigAccount) => {
         this.header();
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         const {programId} = await promptProgramId();
@@ -708,7 +746,7 @@ class Menu{
         }
     }
 
-    programAuthority = async (ms: any, currentAuthority: PublicKey, programId: string) => {
+    programAuthority = async (ms: MultisigAccount, currentAuthority: PublicKey, programId: string) => {
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
         console.log(`This will create a safe upgrade authority transfer transaction of ${programId} to the Squad vault`);
@@ -739,7 +777,7 @@ class Menu{
         }
     }
 
-    programAuthorityOut = async (ms: any, currentAuthority: PublicKey, programId: string) => {
+    programAuthorityOut = async (ms: MultisigAccount, currentAuthority: PublicKey, programId: string) => {
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
         console.log(`This will create a safe upgrade authority transfer transaction of ${programId} out of the Squad vault`);
@@ -819,7 +857,7 @@ class Menu{
         }
     }
 
-    ata = async (ms: any) => {
+    ata = async (ms: MultisigAccount) => {
         clear();
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
@@ -844,7 +882,7 @@ class Menu{
         this.multisig(ms);
     }
 
-    nfts = async (ms: any) => {
+    nfts = async (ms: MultisigAccount) => {
         clear();
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
@@ -860,7 +898,7 @@ class Menu{
         }
     }
 
-    validator = async (ms: any) => {
+    validator = async (ms: MultisigAccount) => {
         clear()
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
@@ -872,7 +910,7 @@ class Menu{
         }
     }
 
-    validatorWithdrawAuthorityChange = async (ms: any) => {
+    validatorWithdrawAuthorityChange = async (ms: MultisigAccount) => {
         clear();
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
@@ -908,7 +946,7 @@ class Menu{
         }
     }
 
-    transferWithdrawAuthorityOut = async (ms: any, withdrawAuthority: string, validatorId: string, destination: string) => {
+    transferWithdrawAuthorityOut = async (ms: MultisigAccount, withdrawAuthority: string, validatorId: string, destination: string) => {
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
         console.log(`This will create a transaction for the transfer of the validator (${validatorId}) withdraw authority out of the Squad vault`);
@@ -938,7 +976,7 @@ class Menu{
         }
     }
 
-    nftAuthorityChange = async (ms: any) => {
+    nftAuthorityChange = async (ms: MultisigAccount) => {
         clear();
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
@@ -982,7 +1020,7 @@ class Menu{
     }
 
     // this can simply be transferred to the vault directly with metaplex program
-    nftAuthorityChangeIncoming = async (ms: any, mintList: PublicKey[], newAuthority: PublicKey) => {
+    nftAuthorityChangeIncoming = async (ms: MultisigAccount, mintList: PublicKey[], newAuthority: PublicKey) => {
         clear();
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
@@ -1074,7 +1112,7 @@ class Menu{
     };
 
     // to move the authority out, transaction will need to be created
-    nftAuthorityChangeOutgoing = async (ms: any, mintList: PublicKey[], newAuthority: PublicKey) => {
+    nftAuthorityChangeOutgoing = async (ms: MultisigAccount, mintList: PublicKey[], newAuthority: PublicKey) => {
         clear();
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
@@ -1110,7 +1148,7 @@ class Menu{
                 estimateSpinner.start();
                 const estimate = await estimateBulkUpdate(this.api.squads, this.api.connection, buckets, this.wallet.publicKey);
                 estimateSpinner.stop();
-                console.log(`NOTICE: The cost estimate for staging these transactions is roughly ${estimate}SOL (this is an estimate, the actual cost may vary).`);
+                console.log(`NOTICE: The cost estimate for staging these transactions is roughly ${estimate}VLX (this is an estimate, the actual cost may vary).`);
                 console.log(` Make sure that the CLI wallet has enough to cover the creation.`);
             }catch(e) {
                 console.log(`(Unable to calculate the estimate cost of initiating the transactions)`);
@@ -1166,7 +1204,7 @@ class Menu{
         this.nfts(ms);
     };
 
-    nftValidateMetaAuthorities = async (ms: any) => {
+    nftValidateMetaAuthorities = async (ms: MultisigAccount) => {
         clear();
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
@@ -1212,7 +1250,7 @@ class Menu{
         this.nfts(ms);
     }
 
-    nftBatchTransfer = async (ms: any) => {
+    nftBatchTransfer = async (ms: MultisigAccount) => {
         clear();
         const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
         this.header(vault);
@@ -1246,7 +1284,7 @@ class Menu{
                     estimateSpinner.start();
                     const estimate = await estimateBulkWithdrawNFT(this.api.squads, this.api.connection, buckets, this.wallet.publicKey);
                     estimateSpinner.stop();
-                    console.log(`NOTICE: The cost estimate for staging these transactions is roughly ${estimate}SOL (this is an estimate, the actual cost may vary).`);
+                    console.log(`NOTICE: The cost estimate for staging these transactions is roughly ${estimate}VLX (this is an estimate, the actual cost may vary).`);
                     console.log(` Make sure that the CLI wallet has enough to cover the creation.`);
                 }catch(e) {
                     console.log(`(Unable to calculate the estimate cost of initiating the transactions)`);
