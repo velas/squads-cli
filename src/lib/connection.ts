@@ -9,13 +9,13 @@ class CliConnection {
             cluster = "http://127.0.0.1:8899";
         }
         else if (hostUrl === "devnet"){
-            cluster = "https://api.devnet.solana.com";
+            cluster = "https://api.devnet.velas.com";
         }
         else if (hostUrl === null || hostUrl === "mainnet" || hostUrl === "mainnet-beta"){
-            cluster = "https://api.mainnet-beta.solana.com";
+            cluster = "https://api.mainnet.velas.com";
         }
         else if (hostUrl === ""){
-            cluster = "https://api.mainnet-beta.solana.com";
+            cluster = "https://api.mainnet.velas.com";
         }
         else {
             cluster = hostUrl;
@@ -26,7 +26,6 @@ class CliConnection {
         }
         this.connection = new web3.Connection(cluster);
     }
-
 }
 
 export default CliConnection;

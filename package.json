@@ -4,6 +4,7 @@
   "description": "",
   "main": "bin/index.js",
   "scripts": {
+    "serve": "tsc && node .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": {

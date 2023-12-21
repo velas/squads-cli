@@ -3,7 +3,7 @@ import fs from "fs";
 import * as anchor from "@coral-xyz/anchor";
 
 const homedir = os.homedir();
-const defaultWalletPath = `${homedir}/.config/solana/id.json`;
+const defaultWalletPath = `${homedir}/.config/velas/id.json`;
 
 class CliWallet {
     walletPath: string;

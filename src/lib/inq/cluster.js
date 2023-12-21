@@ -5,7 +5,7 @@ export default () => {
         {
             name: 'cluster',
             type: 'input',
-            message: 'Enter the rpc cluster to use (or enter for mainnet-beta):',
+            message: 'Enter the rpc cluster to use (or enter for mainnet):',
           }
       ];
       return inquirer.prompt(questions);

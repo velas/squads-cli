@@ -20,4 +20,4 @@ Running the simple command will start the tool and ask a few setup questions for
 
 ### Cluster Option
 Providing the cluster will bypass the question upon startup\
-`squads-cli --cluster https://api.mainnet-beta.solana.com`
+`squads-cli --cluster https://api.mainnet.velas.com`

@@ -10,6 +10,7 @@ import SetupCluster from "./lib/inq/cluster.js";
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers'
 import {parseLedgerWallet} from "@marinade.finance/ledger-utils";
+import { PROGRAM_ID, PROGRAM_MANAGER_PROGRAM_ID, TXMETA_PROGRAM_ID } from './lib/constants.js';
 
 const VERSION = "2.1.3";
 
@@ -54,12 +55,18 @@ if (argv.cluster && argv.cluster.length > 0){
 }
 if (argv.programId && argv.programId.length > 0){
     programId = argv.programId;
+} else {
+    programId = PROGRAM_ID
 }
 if (argv.programManagerId && argv.programManagerId.length > 0){
     programManagerId = argv.programManagerId;
+} else {
+    programManagerId = PROGRAM_MANAGER_PROGRAM_ID
 }
 if (argv.txMetaProgramId && argv.txMetaProgramId.length > 0) {
     txMetaProgramId = argv.txMetaProgramId;
+} else {
+    txMetaProgramId = TXMETA_PROGRAM_ID
 }
 
 if (argv.help){
