@@ -1,79 +1,52 @@
 #!/usr/bin/env node
-import clear from 'clear';
-import chalk from 'chalk';
+import clear from 'clear'
+import chalk from 'chalk'
 
-import Menu from "./lib/menu";
-import CliWallet from './lib/wallet';
-import CliConnection from "./lib/connection";
-import SetupWallet from "./lib/inq/walletPath";
-import SetupCluster from "./lib/inq/cluster";
-import yargs from 'yargs';
-import {hideBin} from 'yargs/helpers'
-import {parseLedgerWallet} from "@marinade.finance/ledger-utils";
-import { PROGRAM_ID, PROGRAM_MANAGER_PROGRAM_ID, TXMETA_PROGRAM_ID } from './lib/constants';
+import Menu from "./lib/menu"
+import CliWallet from './lib/wallet'
+import CliConnection from "./lib/connection"
+import SetupWallet from "./lib/inq/walletPath"
+import SetupCluster from "./lib/inq/cluster"
+import yargs from 'yargs'
+import { hideBin } from 'yargs/helpers'
+import { parseLedgerWallet } from "@marinade.finance/ledger-utils"
+import * as Default from './lib/constants'
 
-const VERSION = require("../package.json").version;
+const VERSION = require("../package.json").version
 
 const argv = yargs(hideBin(process.argv)).options({
-    cluster: { type: 'string'},
-    programId: { type: 'string'},
-    programManagerId: { type: 'string'},
-    txMetaProgramId: { type: 'string'},
-  }).parseSync();
+    cluster: { string: true },
+    programId: { string: true, default: Default.PROGRAM_ID },
+    programManagerId: { string: true, default: Default.PROGRAM_MANAGER_ID },
+    txMetaProgramId: { string: true, default: Default.TXMETA_PROGRAM_ID },
+}).parseSync()
 
-const load = async (programId: string, programManagerId: string, txMetaProgramId: string, initCluster?: string) => {
-    clear();
+const load = async (programId: string, programManagerId: string, txMetaProgramId: string, cluster?: string) => {
+    clear()
     console.log(chalk.yellow('Starting Squads CLI...') + " Follow the prompts to get started")
-    const {walletPath} = await SetupWallet();
+    const {walletPath} = await SetupWallet()
     const ledgerWallet = await parseLedgerWallet(walletPath)
-    const cliWallet = new CliWallet(walletPath, ledgerWallet);
-    let cliConnection;
-    if(!initCluster){
-        const {cluster} = await SetupCluster();
-        cliConnection = new CliConnection(cluster);
-    }else{
-        cliConnection = new CliConnection(initCluster);
-    }
+    const cliWallet = new CliWallet(walletPath, ledgerWallet)
+    const cliConnection = cluster ? new CliConnection(cluster) : new CliConnection((await SetupCluster()).cluster)
 
     // start the menu
-    const cli = new Menu(cliWallet, cliConnection, programId, programManagerId, txMetaProgramId);
-    cli.top();
-};
+    const cli = new Menu(cliWallet, cliConnection, programId, programManagerId, txMetaProgramId)
+    cli.top()
+}
 
 const help = async () => {
-    clear();
+    clear()
     console.log("Squads CLI is in alpha, more commands and options are in progress.")
-    console.log("For more information, visit https://github.com/squads-protocol/squads-cli");
-};
-
-let cluster;
-let programId;
-let programManagerId;
-let txMetaProgramId;
-if (argv.cluster && argv.cluster.length > 0){
-    cluster = argv.cluster;
-}
-if (argv.programId && argv.programId.length > 0){
-    programId = argv.programId;
-} else {
-    programId = PROGRAM_ID
-}
-if (argv.programManagerId && argv.programManagerId.length > 0){
-    programManagerId = argv.programManagerId;
-} else {
-    programManagerId = PROGRAM_MANAGER_PROGRAM_ID
-}
-if (argv.txMetaProgramId && argv.txMetaProgramId.length > 0) {
-    txMetaProgramId = argv.txMetaProgramId;
-} else {
-    txMetaProgramId = TXMETA_PROGRAM_ID
+    console.log("For more information, visit:")
+    console.log("https://github.com/squads-protocol/squads-cli")
+    console.log("https://github.com/velas/squads-cli")
 }
 
-if (argv.help){
-    help();
-}else if (argv.version || argv.v){
-    console.log(VERSION);
-}else {
-    clear();
-    load(programId, programManagerId, txMetaProgramId, cluster);
+if (argv.help) {
+    help()
+} else if (argv.version || argv.v) {
+    console.log(VERSION)
+} else {
+    clear()
+    load(argv.programId, argv.programManagerId, argv.txMetaProgramId, argv.cluster)
 }
