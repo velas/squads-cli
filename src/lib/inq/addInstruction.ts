@@ -95,7 +95,7 @@ export default  async () => {
     if (programId.length === 0) {
         return false;
     }
-    const accounts = [];
+    const accounts: any[] = [];
     let moreAccounts = true;
     while(moreAccounts) {
         const account = await inputAccountInq(accounts.length);

@@ -777,7 +777,7 @@ class Menu{
         if (createKey.length > 0) {
             initKey = createKey;
         }
-        let members = [];
+        let members: any[] = [];
         const {member} = await createMultisigMemberInq();
         let newMember = member;
         while (newMember !== "") {
@@ -787,7 +787,7 @@ class Menu{
             const {member} = await createMultisigMemberInq();
             newMember = member;
         }
-        const {threshold} = await createMultisigThresholdInq();
+        const {threshold} = await createMultisigThresholdInq(members.length);
         const {action} = await createMultisigConfirmInq(initKey, members, threshold);
         if (action) {
             const createMembers = members.map(m => new anchor.web3.PublicKey(m));
@@ -1018,8 +1018,8 @@ class Menu{
             console.log("Transfering metadata update authority to the vault, this may take some time depending on the number of mints and your internet connection speed.");
             const status = new Spinner("Updating authority of the metadata accounts...");
             status.start();
-            const successUpdates = [];
-            const failedUpdates = [];
+            const successUpdates: any[] = [];
+            const failedUpdates: any[] = [];
             for (const mint of mintList) {
                 try {
                     const {blockhash, lastValidBlockHeight} = await this.api.connection.getLatestBlockhash();
@@ -1044,8 +1044,8 @@ class Menu{
                 }
                 const {rerun} = await nftUpdateTryFailuresInq(failedUpdates.length);
                 if (rerun) {
-                    const secondPass = [];
-                    const secondPassFails = [];
+                    const secondPass: any[] = [];
+                    const secondPassFails: any[] = [];
                     const status = new Spinner(`Updating authority of the ${failedUpdates.length} remaining metadata accounts...`);
                     status.start();
                     for (const mint of failedUpdates) {
@@ -1131,7 +1131,7 @@ class Menu{
             const logFilename = path.join(process.cwd(),`/authority-out-${logtime}.txt`);
             const transferOutWriteStream = fs.createWriteStream(logFilename, "utf8");
             transferOutWriteStream.write("Initiating bulk outgoing authority change transactions\n");
-            const fullResults = [];
+            const fullResults: any[] = [];
             for(const batch of buckets){
                 const metasAdded = await createAuthorityUpdateTx(this.api.squads, ms.publicKey, vault, newAuthority, batch, this.api.connection, transferOutWriteStream, safeSign);
                 successfullyStagedMetas.push(...metasAdded.attached);
@@ -1262,7 +1262,7 @@ class Menu{
                 const status = new Spinner("Initializing NFTs transfer multisig transactions...");
                 status.start();
                 // setup log file
-                const fullResults = [];
+                const fullResults: any[] = [];
                 for(const batch of buckets){
                     const metasAdded = await createWithdrawNftTx(this.api.squads, ms.publicKey, vault, new PublicKey(destination), batch, this.api.connection);
                     successfullyStagedMetas.push(...metasAdded.attached);

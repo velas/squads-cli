@@ -8,7 +8,7 @@ import axios from "axios";
 
 export const getAssets = async (connection: Connection, userKey: PublicKey) => {
     console.log("Getting accounts for:", userKey.toBase58());
-    const usableTokens = [];
+    const usableTokens: any[] = [];
 
     const parsedAccount = await connection.getParsedTokenAccountsByOwner(userKey, {
         programId: TOKEN_PROGRAM_ID,

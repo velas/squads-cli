@@ -67,7 +67,7 @@ export const getNFTAccounts = async (connection: Connection, publicKey: PublicKe
 
                     return pdaRes.map((mpr: any, i) => {
                         // try to create the Metadata object
-                        let md = null;
+                        let md: any = null;
                         try {
                             md = new programs.metadata.Metadata(filtered[i].mint, mpr.account);
                         } catch (e) {
@@ -141,7 +141,7 @@ export const getOldNFTAccounts = async (connection: Connection, publicKey: Publi
                             return null;
                         }
                         // try to create the Metadata object
-                        let md = null;
+                        let md: any = null;
                         try {
                             md = new programs.metadata.Metadata(filtered[i].mint, mpr.account);
                         }
@@ -191,8 +191,8 @@ type BatchTransactionCreationError = 'approval' | 'activation' | 'none';
 export const createAuthorityUpdateTx = async (squadsSdk: Squads, multisig: PublicKey, currentAuthority: PublicKey, newAuthority: PublicKey, mints: PublicKey[], connection: Connection, ws: fs.WriteStream, safeSign?: boolean) => {
     // create the transaction to update the authority
     // attach the update authority ix to the transaction (up to 250)
-    const attached = [];
-    const attachFails = [];
+    const attached: any[] = [];
+    const attachFails: any[] = [];
     let txError: BatchTransactionCreationError = 'none';
     const queue = mints;
     let txState = await squadsSdk.createTransaction(multisig, 1);
@@ -201,7 +201,7 @@ export const createAuthorityUpdateTx = async (squadsSdk: Squads, multisig: Publi
     const batchLength = mints.length;
     ws.write(`Attaching ${batchLength} instructions for each metadata account\n`);
     let hasError = false;
-    const failures = [];
+    const failures: any[] = [];
     while (queue.length > 0) {
         const mint = queue.shift();
         if (!mint) {
@@ -316,8 +316,8 @@ export const getMetadataAccount = (mint: PublicKey) => {
 };
 
 export const checkAllMetas = async (connection: Connection, mints: PublicKey[]) => {
-    const success = [];
-    const failures = []
+    const success: any[] = [];
+    const failures: any[] = []
     for (const mint of mints) {
         const valid = await validateMetadataAccount(connection, getMetadataAccount(mint));
         if (valid) {
@@ -366,8 +366,8 @@ export const checkMetadataAuthority = async (connection: Connection, metadataAcc
 }
 
 export const checkAllMetasAuthority = async (connection: Connection, mints: PublicKey[], authority: PublicKey) => {
-    const success = [];
-    const failures = []
+    const success: any[] = [];
+    const failures: any[] = []
     for (const mint of mints) {
         try {
             const valid = await checkMetadataAuthority(connection, getMetadataAccount(mint), authority);
@@ -405,7 +405,7 @@ export const sendTxMetaIx = async (msPDA: PublicKey, txPDA: PublicKey, member: P
       ]);
     
       const meta = Buffer.from(JSON.stringify(dataObj));
-      const accountsList = [];
+      const accountsList: any[] = [];
     
       accountsList.push({
         pubkey: member,
@@ -457,8 +457,8 @@ export const estimateBulkWithdrawNFT = async (sdk: Squads, connection: Connectio
 export const checkIfMintsAreValidAndOwnedByVault = async (connection: Connection, mints: PublicKey[], vault: PublicKey) => {
     const metaplex = new Metaplex(connection);
 
-    const success = []
-    const failures = []
+    const success: any[] = []
+    const failures: any[] = []
 
     try {
         const loadedNFTs = await metaplex.nfts().findAllByMintList({
@@ -486,14 +486,14 @@ export const checkIfMintsAreValidAndOwnedByVault = async (connection: Connection
 export const createWithdrawNftTx = async (squadsSdk: Squads, multisig: PublicKey, vault: PublicKey, destination: PublicKey, mints: PublicKey[], connection: Connection) => {
     // create the transaction to update the authority
     // attach the update authority ix to the transaction (up to 250)
-    const attached = [];
-    const attachFails = [];
+    const attached: any[] = [];
+    const attachFails: any[] = [];
     let txError: BatchTransactionCreationError = 'none';
     const queue = mints;
     let txState = await squadsSdk.createTransaction(multisig, 1);
     const batchLength = mints.length;
     let hasError = false;
-    const failures = [];
+    const failures: any[] = [];
 
     const keypair = new Keypair({
         publicKey: vault.toBytes(),

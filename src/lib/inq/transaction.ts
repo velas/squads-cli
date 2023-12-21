@@ -1,7 +1,7 @@
 import inquirer from "inquirer";
 
 export default (tx) => {
-    let choices = [];
+    let choices: string[] = [];
     if(tx.status.active) {
         choices = ["Approve", "Reject"];
     }
