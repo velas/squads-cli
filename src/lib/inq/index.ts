@@ -1,22 +1,22 @@
-import mainMenu from "./main.js";
-import viewMultisigsMenu from "./listMultisigs.js";
-import multisigMainMenu from "./multisigTop.js";
-import vaultMenu from "./vault.js";
-import multisigSettingsMenu from "./settings.js";
-import transactionsMenu from "./transactions.js";
-import createMultisigCreateKeyInq from "./createKey.js";
-import createMultisigThresholdInq from "./createThreshold.js";
-import createMultisigMemberInq from "./createMember.js";
-import createMultisigConfirmInq from "./createConfirm.js";
-import promptProgramId from "./programId.js";
-import transactionPrompt from "./transaction.js";
-import basicConfirm from "./confirmYN.js";
-import createTransactionInq from "./createTransaction.js";
-import addTransactionInq from "./addTransaction.js";
-import continueInq from "./continue.js";
-import addInstructionInq from "./addInstruction.js";
-import withdrawInq from "./withdraw.js";
-import createATAInq from "./createATA.js";
+import mainMenu from "./main";
+import viewMultisigsMenu from "./listMultisigs";
+import multisigMainMenu from "./multisigTop";
+import vaultMenu from "./vault";
+import multisigSettingsMenu from "./settings";
+import transactionsMenu from "./transactions";
+import createMultisigCreateKeyInq from "./createKey";
+import createMultisigThresholdInq from "./createThreshold";
+import createMultisigMemberInq from "./createMember";
+import createMultisigConfirmInq from "./createConfirm";
+import promptProgramId from "./programId";
+import transactionPrompt from "./transaction";
+import basicConfirm from "./confirmYN";
+import createTransactionInq from "./createTransaction";
+import addTransactionInq from "./addTransaction";
+import continueInq from "./continue";
+import addInstructionInq from "./addInstruction";
+import withdrawInq from "./withdraw";
+import createATAInq from "./createATA";
 import {
     nftMainInq,
     nftUpdateAuthorityInq,
@@ -31,7 +31,7 @@ import {
     nftUpdateTryFailuresInq,
     nftMintListInq,
     nftTransferDestinationInq,
-} from "./nftMenu.js";
+} from "./nftMenu";
 
 export {
     mainMenu,
