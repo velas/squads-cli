@@ -258,34 +258,37 @@ class Menu{
 
             const { yes } = await basicConfirm("Commit transaction to the blockchain?", false)
 
-            if (yes) {
-                const status = new Spinner("Receiving latest blockhash... ")
-                status.start()
-
-                const blockhash = await (await this.connection.getLatestBlockhash('confirmed')).blockhash
-                authorizeWithdraw.recentBlockhash = blockhash
-                authorizeWithdraw.sign(this.wallet.payer)
-
-                console.log(blockhash)
-                status.message("Sending transaction... ")
-                
-                const vtx = new VersionedTransaction(authorizeWithdraw.compileMessage())
-
-                // simulating delay
-                await new Promise(resolve => setTimeout(resolve, 2500));
-                const signature = "foobarfoobar"
-                // const signature = await this.connection.sendTransaction(vtx)
-
-                console.log("done!")
-
-                status.stop()
-                console.log("Transaction sent! Signature: " + chalk.blue(signature))
-                console.log("Verify stake Account with Velas CLI")
-                console.log(chalk.blue(`velas stake-account --url ${this.connection.rpcEndpoint} ${stakeAccountPub.toBase58()}`))
-
-                await continueInq()
+            if (!yes) {
+                return this.multisig(ms)
             }
-            this.multisig(ms);
+
+            const status = new Spinner("Receiving latest blockhash... ")
+            status.start()
+
+            const blockhash = await (await this.connection.getLatestBlockhash('confirmed')).blockhash
+            authorizeWithdraw.recentBlockhash = blockhash
+            authorizeWithdraw.sign(this.wallet.payer)
+
+            console.log(blockhash)
+            status.message("Sending transaction... ")
+            
+            const vtx = new VersionedTransaction(authorizeWithdraw.compileMessage())
+
+            // simulating delay
+            await new Promise(resolve => setTimeout(resolve, 2500));
+            const signature = "foobarfoobar"
+            // const signature = await this.connection.sendTransaction(vtx)
+
+            console.log("done!")
+
+            status.stop()
+            console.log("Transaction sent! Signature: " + chalk.blue(signature))
+            console.log("Verify stake Account with Velas CLI")
+            console.log(chalk.blue(`velas stake-account --url ${this.connection.rpcEndpoint} ${stakeAccountPub.toBase58()}`))
+
+            await continueInq()
+
+            return this.multisig(ms)
         } else if (assemble == DO_WITHDRAW_STAKE) {
             const { authority } = await createTransactionInq()
             const authorityBN = new BN(authority, 10)

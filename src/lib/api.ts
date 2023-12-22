@@ -12,11 +12,11 @@ import {Connection, LAMPORTS_PER_SOL, PublicKey, VoteProgram} from "@solana/web3
 
 class API{
     squads: Squads;
-    wallet;
+    wallet: anchor.Wallet
     connection: Connection;
     programId: PublicKey;
     program: Program;
-    provider;
+    provider: anchor.AnchorProvider
     programManagerId: PublicKey;
     constructor(wallet: Wallet, connection: Connection, programId: PublicKey, programManagerId: PublicKey){
         this.programId = programId;
