@@ -1,5 +1,5 @@
 {
-    "compilerOptions": {
+   "compilerOptions": {
       "outDir": "./bin",
       "allowJs": true,
       "target": "es6",
@@ -16,7 +16,7 @@
       "strict": true,
       "importHelpers": true,
       "noImplicitAny": false
-    },
-    "exclude": ["node_modules", "dist"],
-    "include": ["src/**/*"]
-  }
+   },
+   "exclude": ["node_modules", "dist"],
+   "include": ["src/**/*"]
+}
