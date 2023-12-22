@@ -17,6 +17,8 @@ import continueInq from "./continue";
 import addInstructionInq from "./addInstruction";
 import withdrawInq from "./withdraw";
 import createATAInq from "./createATA";
+import askPublicAddress from "./askPublicAddress";
+import askVlx from "./askVlx";
 import {
     nftMainInq,
     nftUpdateAuthorityInq,

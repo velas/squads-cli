@@ -4,13 +4,13 @@ import chalk from 'chalk'
 
 import Menu from "./lib/menu"
 import CliWallet from './lib/wallet'
-import CliConnection from "./lib/connection"
 import SetupWallet from "./lib/inq/walletPath"
 import SetupCluster from "./lib/inq/cluster"
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import { parseLedgerWallet } from "@marinade.finance/ledger-utils"
 import * as Default from './lib/constants'
+import { Connection } from '@solana/web3.js'
 
 const VERSION = require("../package.json").version
 
@@ -27,10 +27,12 @@ const load = async (programId: string, programManagerId: string, txMetaProgramId
     const {walletPath} = await SetupWallet()
     const ledgerWallet = await parseLedgerWallet(walletPath)
     const cliWallet = new CliWallet(walletPath, ledgerWallet)
-    const cliConnection = cluster ? new CliConnection(cluster) : new CliConnection((await SetupCluster()).cluster)
+
+    const endpoint = intoUrl(cluster || (await SetupCluster()).cluster)
+    const connection = new Connection(endpoint)
 
     // start the menu
-    const cli = new Menu(cliWallet, cliConnection, programId, programManagerId, txMetaProgramId)
+    const cli = new Menu(cliWallet, connection, programId, programManagerId, txMetaProgramId)
     cli.top()
 }
 
@@ -38,8 +40,23 @@ const help = async () => {
     clear()
     console.log("Squads CLI is in alpha, more commands and options are in progress.")
     console.log("For more information, visit:")
-    console.log("https://github.com/squads-protocol/squads-cli")
     console.log("https://github.com/velas/squads-cli")
+    console.log("https://github.com/squads-protocol/squads-cli")
+}
+
+function intoUrl(cluster: string) {
+    switch (cluster) {
+        case "localnet":
+            return "http://127.0.0.1:8899"
+        case "testnet":
+        case "t":
+            return "https://api.testnet.velas.com"
+        case "mainnet":
+        case "m":
+            return "https://api.mainnet.velas.com"
+        default:
+            return Default.CLUSTER
+    }
 }
 
 if (argv.help) {

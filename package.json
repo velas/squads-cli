@@ -53,7 +53,7 @@
     "@octokit/rest": "^19.0.3",
     "@solana/spl-token": "^0.3.6",
     "@solana/spl-token-registry": "^0.2.4574",
-    "@solana/web3.js": "^1.66.2",
+    "@solana/web3.js": "^1.87.6",
     "@sqds/sdk": "^2.0.2",
     "@types/bn.js": "^5.1.1",
     "@types/clear": "^0.1.2",
@@ -84,7 +84,7 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "@types/inquirer": "^9.0.3",
+    "@types/inquirer": "^8.0.0",
     "@types/node": "^20.10.5",
     "@types/yargs": "^17.0.22",
     "ts-node": "^10.9.1"

@@ -10,7 +10,7 @@ import path from 'path';
 
 import { MultisigAccount, getAuthorityPDA, getIxPDA } from '@sqds/sdk';
 import BN from 'bn.js';
-import { PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, LAMPORTS_PER_SOL, PublicKey, StakeProgram, Transaction, VersionedTransaction } from '@solana/web3.js';
 import {
     mainMenu,
     viewMultisigsMenu,
@@ -62,6 +62,10 @@ import {
 import { updateMetadataAuthorityIx } from './metadataInstructions';
 import {nftWithdrawConfirmInq} from "./inq/nftMenu";
 import {validatorMainInq, validatorWithdrawAuthDestPrompt, validatorWithdrawAuthPrompt} from "./inq/validatorMenu";
+import { clone } from 'lodash';
+import CliWallet from './wallet';
+import askPublicAddress from './inq/askPublicAddress';
+import askVlx from './inq/askVlx';
 
 const Spinner = CLI.Spinner;
 const Progress = CLI.Progress;
@@ -71,11 +75,11 @@ class Menu{
     programManagerId: PublicKey;
     txMetaProgramId: PublicKey;
     multisigs: MultisigAccount[] = [];
-    wallet;
+    wallet: anchor.Wallet;
     api: API;
-    connection;
+    connection: Connection;
     walletBalance: number = 0;
-    constructor(wallet: any, connection: any, programId: string, programManagerId: string, txMetaProgramId: string) {
+    constructor(wallet: CliWallet, connection: Connection, programId: string, programManagerId: string, txMetaProgramId: string) {
         this.wallet = wallet.wallet;
         this.connection = connection;
         this.programId = new PublicKey(programId);
@@ -102,6 +106,7 @@ class Menu{
     header = async (vault?: PublicKey) => {
         this.api.getWalletBalance();
         clear();
+        console.log(`Endpoint: ${this.connection.rpcEndpoint}`)
         console.log(`ProgramId: ${this.programId.toBase58()}`);
         console.log(
             chalk.yellow(
@@ -219,9 +224,9 @@ class Menu{
     };
 
     createTransaction = async (ms: MultisigAccount) => {
-        // const TRANSFER_WITHDRAW_AUTHORITY = "Authorize current Vault to withdraw Stake"
-        const WITHDRAW_STAKE = "Create withdraw Stake transaction"
-        const ENTER_RAW_TX = "Enter Arbitraty Transaction (base58 serialized message)"
+        const AUTH_WITHDRAW_STAKE = "Transfer Stake Withdraw Authority"
+        const DO_WITHDRAW_STAKE = "Put Stake Withdraw transaction"
+        const ENTER_RAW_TX = "Put Arbitraty Transaction (base58 serialized message)"
         const ASSEMBLE_DRAFT_TX = "Assemble Transaction (create draft)"
         const GO_BACK = "<- Go back"
 
@@ -229,43 +234,111 @@ class Menu{
             default: "",
             name: 'assemble',
             type: 'list',
-            choices: [WITHDRAW_STAKE, ENTER_RAW_TX, ASSEMBLE_DRAFT_TX, GO_BACK],
+            choices: [AUTH_WITHDRAW_STAKE, DO_WITHDRAW_STAKE, ENTER_RAW_TX, ASSEMBLE_DRAFT_TX, GO_BACK],
             message: 'How do you want to create the transaction?',
         });
 
-        if (assemble === WITHDRAW_STAKE) {
+        if (assemble === AUTH_WITHDRAW_STAKE) {
+            const [ vaultPDA ] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
 
+            const { publicAddress } = await askPublicAddress('Enter Stake Account public key in base58:')
+            const stakeAccountPub = new PublicKey(publicAddress)
 
+            let authorizeWithdraw = StakeProgram.authorize({
+                authorizedPubkey: this.wallet.publicKey,
+                newAuthorizedPubkey: vaultPDA,
+                stakePubkey: stakeAccountPub,
+                stakeAuthorizationType: { index: 1 } // 1 == withdraw
+            })
 
-            let printable: any = ms
-            printable.publicKey = ms.publicKey.toBase58()
-            printable.createKey = ms.createKey.toBase58()
-            printable.keys = printable.keys.map(k => k.toBase58())
-            console.log(printable)
-            // {
-            //   threshold: 1,
-            //   authorityIndex: 1,
-            //   transactionIndex: 3,
-            //   msChangeIndex: 0,
-            //   bump: 255,
-            //   createKey: 'AefyJ2dRBiNvX4j5fUuDjjLHBadNojCm6SDmMU1BxTSX',
-            //   allowExternalExecute: false,
-            //   keys: [ '88zkBGE7turbMwQew3GAtNK9JmnrE7t6mggSqtBgFyAt' ],
-            //   publicKey: 'ELgNUZPYdQQqAW6ZPwJtiGR4pEETMAsA6MMito1Cpx58'
-            // }
+            console.log(chalk.yellowBright("WARNING! Withdraw Authority will be changed!"))
+            console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
+            console.log("Current Withdrawer " + chalk.blue(this.wallet.publicKey.toBase58()))
+            console.log("New Withdrawer " + chalk.blue(vaultPDA.toBase58()))
 
-            const [vaultPDA] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId);
-            const vault = await this.api.getVaultAssets(vaultPDA);
+            const { yes } = await basicConfirm("Commit transaction to the blockchain?", false)
 
-            console.log("Vault PDA: " + vaultPDA.toBase58())
-            console.log("Vault: ")
-            console.log(vault)
+            if (yes) {
+                const status = new Spinner("Receiving latest blockhash... ")
+                status.start()
 
+                const blockhash = await (await this.connection.getLatestBlockhash('confirmed')).blockhash
+                authorizeWithdraw.recentBlockhash = blockhash
+                authorizeWithdraw.sign(this.wallet.payer)
 
+                console.log(blockhash)
+                status.message("Sending transaction... ")
+                
+                const vtx = new VersionedTransaction(authorizeWithdraw.compileMessage())
 
-            const {yes} = await basicConfirm("Continue?", false);
+                // simulating delay
+                await new Promise(resolve => setTimeout(resolve, 2500));
+                const signature = "foobarfoobar"
+                // const signature = await this.connection.sendTransaction(vtx)
+
+                console.log("done!")
+
+                status.stop()
+                console.log("Transaction sent! Signature: " + chalk.blue(signature))
+                console.log("Verify stake Account with Velas CLI")
+                console.log(chalk.blue(`velas stake-account --url ${this.connection.rpcEndpoint} ${stakeAccountPub.toBase58()}`))
+
+                await continueInq()
+            }
             this.multisig(ms);
-        } else if(assemble === ENTER_RAW_TX){
+        } else if (assemble == DO_WITHDRAW_STAKE) {
+            const { authority } = await createTransactionInq()
+            const authorityBN = new BN(authority, 10)
+            const [ authorityPDA ] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId)
+
+            const stakeAccount = await askPublicAddress('Enter Stake account public key in base58:')
+            const stakeAccountPub = new PublicKey(stakeAccount.publicAddress)
+
+            const recipient = await askPublicAddress('Enter token Recipient public key in base58:')
+            const recipientPub = new PublicKey(recipient.publicAddress)
+
+            const amount = await askVlx()
+            const vlx = parseInt(amount.vlx)
+
+            const withdrawStake = StakeProgram.withdraw({
+                stakePubkey: stakeAccountPub,
+                lamports: vlx * LAMPORTS_PER_SOL,
+                authorizedPubkey: authorityPDA,
+                toPubkey: recipientPub
+            })
+
+            console.log(chalk.yellowBright("Please, verify transaction details before proceed:"))
+            console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
+            console.log("Recipient Account: " + chalk.blue(recipientPub.toBase58()))
+            console.log("Amount of VLX: " + chalk.blue(Intl.NumberFormat("en-US").format(vlx)))
+
+            console.log("This will create a new multisig transaction for authority/signer " + chalk.blue(authorityPDA.toBase58()));
+            const {yes} = await basicConfirm(`Create Stake Withdraw transaction?`, false);
+
+            if (yes) {
+                const status = new Spinner("Creating draft transaction... ");
+                status.start()
+                const tx = await this.api.createTransaction(ms.publicKey, parseInt(authority, 10))
+                console.log("done!")
+                status.message("Adding Withdraw instruction... ")
+                await this.api.addInstruction(tx.publicKey, withdrawStake.instructions[0])
+                console.log("done!")
+                status.message("Activating transaction... ")
+                await this.api.activate(tx.publicKey)
+                console.log("done!")
+                status.message("Approving transaction... ")
+                await this.api.approveTransaction(tx.publicKey)
+                console.log("done!")
+                status.stop()
+                
+                console.log("Success! Transaction key: " + chalk.blue(tx.publicKey.toBase58()));
+                await continueInq()
+
+                const txs = await this.api.getTransactions(ms);
+                this.transactions(txs, ms);
+            }
+            this.multisig(ms);
+        } else if (assemble === ASSEMBLE_DRAFT_TX) {
             const {authority} = await createTransactionInq();
             const authorityBN = new BN(authority, 10);
             const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId);
@@ -285,7 +358,7 @@ class Menu{
             }else {
                 this.multisig(ms);
             }
-        }else if(assemble === ASSEMBLE_DRAFT_TX) {
+        } else if(assemble === ENTER_RAW_TX) {
             const {authority} = await createTransactionInq();
             const authorityBN = new BN(authority, 10);
             const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId);

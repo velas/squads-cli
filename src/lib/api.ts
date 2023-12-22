@@ -4,7 +4,7 @@ import BN from "bn.js";
 import { getProgramData, upgradeSetAuthorityIx } from "./program";
 import { getAssets } from "./assets";
 import {getAssociatedTokenAddress,createAssociatedTokenAccountInstruction} from "@solana/spl-token";
-import {idl} from "../info";
+import idl from "../squads_mpl.json";
 import { ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Program, ProgramAccount, Wallet } from "@coral-xyz/anchor";
@@ -14,18 +14,16 @@ class API{
     squads: Squads;
     wallet;
     connection: Connection;
-    cluster;
     programId: PublicKey;
     program: Program;
     provider;
     programManagerId: PublicKey;
-    constructor(wallet: Wallet, connection: any, programId: PublicKey, programManagerId: PublicKey){
+    constructor(wallet: Wallet, connection: Connection, programId: PublicKey, programManagerId: PublicKey){
         this.programId = programId;
         this.programManagerId = programManagerId;
-        this.squads = Squads.endpoint(connection.cluster, wallet, {commitmentOrConfig: "confirmed", multisigProgramId: this.programId, programManagerProgramId: this.programManagerId});
+        this.squads = Squads.endpoint(connection.rpcEndpoint, wallet, {commitmentOrConfig: "confirmed", multisigProgramId: this.programId, programManagerProgramId: this.programManagerId});
         this.wallet = wallet;
-        this.cluster = connection.cluster;
-        this.connection = connection.connection;
+        this.connection = connection;
         this.provider = new anchor.AnchorProvider(this.connection, this.wallet, {preflightCommitment: "confirmed", commitment: "confirmed"});
         this.program = new anchor.Program(idl as anchor.Idl, this.programId, this.provider);
     }
