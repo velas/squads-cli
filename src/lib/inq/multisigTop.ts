@@ -9,6 +9,7 @@ export default multisig => {
          choices: [
             "Transactions",
             "Create new Transaction",
+            "Stake",
             "Vault",
             "Settings",
             "Create new ATA",

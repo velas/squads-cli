@@ -19,13 +19,14 @@ export const getAssets = async (connection: Connection, userKey: PublicKey) => {
       amount: solInfo / LAMPORTS_PER_SOL,
       source: userKey.toBase58(),
       mint: "So11111111111111111111111111111111111111112",
-      symbol: "VLX", // -> VLX?
+      symbol: "VLX",
       decimals: 9,
       name: "Velas",
    }
    usableTokens.push(solModel)
 
    const tokenList = await new TokenListProvider().resolve().then(knownToken => {
+      // unhardcode slug?
       return knownToken.filterByClusterSlug("mainnet-beta").getList()
    })
 

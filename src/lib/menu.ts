@@ -22,7 +22,6 @@ import {
    mainMenu,
    viewMultisigsMenu,
    multisigMainMenu,
-   vaultMenu,
    multisigSettingsMenu,
    transactionsMenu,
    createMultisigCreateKeyInq,
@@ -75,13 +74,12 @@ import {
    validatorWithdrawAuthDestPrompt,
    validatorWithdrawAuthPrompt,
 } from "./inq/validatorMenu"
-import { clone } from "lodash"
 import CliWallet from "./wallet"
 import askPublicAddress from "./inq/askPublicAddress"
 import askVlx from "./inq/askVlx"
+import { parseStakeAccount } from "./stake"
 
 const Spinner = CLI.Spinner
-const Progress = CLI.Progress
 
 class Menu {
    programId: PublicKey
@@ -187,6 +185,227 @@ class Menu {
       }
    }
 
+   stake = async (ms: MultisigAccount) => {
+      const AUTH_WITHDRAW_STAKE = "Transfer Stake Withdraw Authority"
+      const DO_WITHDRAW_STAKE = "Create Stake Withdraw transaction"
+      const GO_BACK = "<- Go back"
+      const { stake } = await inquirer.prompt({
+         default: "",
+         name: "stake",
+         type: "list",
+         choices: [
+            AUTH_WITHDRAW_STAKE,
+            DO_WITHDRAW_STAKE,
+            GO_BACK,
+         ],
+         message: "What do you want to do?",
+      })
+
+      if (stake === AUTH_WITHDRAW_STAKE) {
+         const [vaultPDA] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId)
+
+         const status = new Spinner("Searching Stake Accounts...")
+         status.start()
+
+         const WITHDRAW_AUTHORITY_OFFSET = 0xC
+         const stakeAccounts = await this.connection.getProgramAccounts(StakeProgram.programId, {
+            filters: [{
+               memcmp: {
+                  offset: WITHDRAW_AUTHORITY_OFFSET,
+                  bytes: this.wallet.publicKey.toBase58(),
+                },
+            }], 
+            commitment: 'processed' 
+         })
+
+         status.stop()
+
+         if (stakeAccounts.length == 0) {
+            console.log("Can't find any Stake Accounts for " + this.wallet.publicKey.toBase58() + " withdraw authority")
+            await continueInq()
+            return this.stake(ms)
+         } else {
+            console.log("\nFound " + stakeAccounts.length + " Stake Account(s):\n")
+
+            let prettyTable: any[] = []
+            let promptChoices: any[] = []
+            for (const acc of stakeAccounts) {
+               const parsed = parseStakeAccount(acc.account.data)
+               
+               const vlx = acc.account.lamports / LAMPORTS_PER_SOL
+               const address = acc.pubkey.toBase58()
+
+               let status: string
+               let withdrawer: string
+               let activatedStake: string
+
+               switch (parsed.kind) {
+                  case "uninitialized":
+                  case "rewardsPool":
+                     throw new Error("Bug: these variants should not be filtered")
+                  case "initialized":
+                     status = "Initialized"
+                     activatedStake = "Not Activated"
+                     withdrawer = new PublicKey(parsed.meta.authorized.withdrawer).toBase58()
+                     break;
+                  case "stake":
+                     status = "Delegated"
+                     let milliVlx = parsed.stake.delegation.stake / BigInt(LAMPORTS_PER_SOL / 1000)
+                     activatedStake = Number(milliVlx) / 1000 + " VLX"
+                     withdrawer = new PublicKey(parsed.meta.authorized.withdrawer).toBase58()
+                     break;
+               }
+
+               prettyTable.push({
+                  Address: address,
+                  Balance: vlx,
+                  Status: status,
+                  "Activated Stake": activatedStake,
+                  Withdrawer: withdrawer,
+               })
+
+               promptChoices.push({
+                  name: `${address} (${activatedStake})`,
+                  value: address,
+               })
+            }
+
+            promptChoices.push({
+               name: GO_BACK,
+               value: GO_BACK
+            })
+
+            console.table(prettyTable)
+
+            const { stakeToAuthorize } = await inquirer.prompt({
+               name: 'stakeToAuthorize',
+               type: 'list',
+               choices: promptChoices,
+               message: "Select Stake Account to change Withdraw Authority:"
+            })
+
+            if (stakeToAuthorize === GO_BACK) {
+               console.log()
+               return this.multisig(ms)
+            }
+
+            const stakeAccountPub = new PublicKey(stakeToAuthorize)
+
+            let authorizeWithdraw = StakeProgram.authorize({
+               authorizedPubkey: this.wallet.publicKey,
+               newAuthorizedPubkey: vaultPDA,
+               stakePubkey: stakeAccountPub,
+               stakeAuthorizationType: { index: 1 }, // 1 == withdraw
+            })
+   
+            console.log()
+            console.log(chalk.yellowBright("WARNING! Withdraw Authority will be changed!"))
+            console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
+            console.log("Current Withdrawer " + chalk.blue(this.wallet.publicKey.toBase58()))
+            console.log("New Withdrawer " + chalk.blue(vaultPDA.toBase58()))
+
+            const { yes } = await basicConfirm("Proceed?", false)
+
+            if (!yes) {
+               return this.stake(ms)
+            }
+
+            status.message("Receiving latest blockhash... ")
+            status.start()
+   
+            const blockhash = await (await this.connection.getLatestBlockhash("confirmed")).blockhash
+            authorizeWithdraw.recentBlockhash = blockhash
+            authorizeWithdraw.sign(this.wallet.payer)
+   
+            console.log(blockhash)
+            status.message("Sending transaction... ")
+   
+            const vtx = new VersionedTransaction(authorizeWithdraw.compileMessage())
+   
+            // simulating delay
+            await new Promise(resolve => setTimeout(resolve, 2500))
+            const signature = "foobarfoobar"
+            // const signature = await this.connection.sendTransaction(vtx)
+   
+            console.log("done!")
+   
+            status.stop()
+            console.log("Transaction sent! Signature: " + chalk.blue(signature))
+
+            // TODO: display info directly
+            console.log("Verify stake Account with Velas CLI")
+            console.log(
+               chalk.blue(
+                  `velas stake-account --url ${
+                     this.connection.rpcEndpoint
+                  } ${stakeAccountPub.toBase58()}`,
+               ),
+            )
+   
+            await continueInq()
+            this.stake(ms)
+         }
+      } else if (stake == DO_WITHDRAW_STAKE) {
+         const { authority } = await createTransactionInq()
+         const authorityBN = new BN(authority, 10)
+         const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId)
+
+         const stakeAccount = await askPublicAddress("Enter Stake account public key in base58:")
+         const stakeAccountPub = new PublicKey(stakeAccount.publicAddress)
+
+         const recipient = await askPublicAddress("Enter token Recipient public key in base58:")
+         const recipientPub = new PublicKey(recipient.publicAddress)
+
+         const amount = await askVlx()
+         const vlx = parseInt(amount.vlx)
+
+         const withdrawStake = StakeProgram.withdraw({
+            stakePubkey: stakeAccountPub,
+            lamports: vlx * LAMPORTS_PER_SOL,
+            authorizedPubkey: authorityPDA,
+            toPubkey: recipientPub,
+         })
+
+         console.log(chalk.yellowBright("Please, verify transaction details before proceed:"))
+         console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
+         console.log("Recipient Account: " + chalk.blue(recipientPub.toBase58()))
+         console.log("Amount of VLX: " + chalk.blue(Intl.NumberFormat("en-US").format(vlx)))
+
+         console.log(
+            "This will create a new multisig transaction for authority/signer " +
+               chalk.blue(authorityPDA.toBase58()),
+         )
+         const { yes } = await basicConfirm(`Create Stake Withdraw transaction?`, false)
+
+         if (!yes) {
+            return this.multisig(ms)
+         }
+
+         const status = new Spinner("Creating draft transaction... ")
+         status.start()
+         const tx = await this.api.createTransaction(ms.publicKey, parseInt(authority, 10))
+         console.log("done!")
+         status.message("Adding Withdraw instruction... ")
+         await this.api.addInstruction(tx.publicKey, withdrawStake.instructions[0])
+         console.log("done!")
+         status.message("Activating transaction... ")
+         await this.api.activate(tx.publicKey)
+         console.log("done!")
+         status.message("Approving transaction... ")
+         await this.api.approveTransaction(tx.publicKey)
+         console.log("done!")
+         status.stop()
+
+         console.log("Success! Transaction key: " + chalk.blue(tx.publicKey.toBase58()))
+         await continueInq()
+
+         const txs = await this.api.getTransactions(ms)
+         this.transactions(txs, ms)
+      } else {
+         this.multisig(ms)
+      }
+   }
+
    multisig = async (ms: MultisigAccount) => {
       const [vault] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId)
       this.header(vault)
@@ -200,7 +419,9 @@ class Menu {
       console.log("Multisig account: " + chalk.white(ms.publicKey.toBase58()))
       console.log(" ")
       const { action } = await multisigMainMenu(ms)
-      if (action === "Vault") {
+      if (action === "Stake") {
+         this.stake(ms)
+      } else if (action === "Vault") {
          // load vault assets
          let status = new Spinner("Loading vault")
          status.start()
@@ -247,19 +468,15 @@ class Menu {
    }
 
    createTransaction = async (ms: MultisigAccount) => {
-      const AUTH_WITHDRAW_STAKE = "Transfer Stake Withdraw Authority"
-      const DO_WITHDRAW_STAKE = "Put Stake Withdraw transaction"
-      const ENTER_RAW_TX = "Put Arbitraty Transaction (base58 serialized message)"
+      // TODO: create simple transfer
+      const ENTER_RAW_TX = "Create Arbitraty Transaction (base58 serialized message)"
       const ASSEMBLE_DRAFT_TX = "Assemble Transaction (create draft)"
       const GO_BACK = "<- Go back"
 
       const { assemble } = await inquirer.prompt({
-         default: "",
          name: "assemble",
          type: "list",
          choices: [
-            AUTH_WITHDRAW_STAKE,
-            DO_WITHDRAW_STAKE,
             ENTER_RAW_TX,
             ASSEMBLE_DRAFT_TX,
             GO_BACK,
@@ -267,121 +484,7 @@ class Menu {
          message: "How do you want to create the transaction?",
       })
 
-      if (assemble === AUTH_WITHDRAW_STAKE) {
-         const [vaultPDA] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId)
-
-         const { publicAddress } = await askPublicAddress(
-            "Enter Stake Account public key in base58:",
-         )
-         const stakeAccountPub = new PublicKey(publicAddress)
-
-         let authorizeWithdraw = StakeProgram.authorize({
-            authorizedPubkey: this.wallet.publicKey,
-            newAuthorizedPubkey: vaultPDA,
-            stakePubkey: stakeAccountPub,
-            stakeAuthorizationType: { index: 1 }, // 1 == withdraw
-         })
-
-         console.log(chalk.yellowBright("WARNING! Withdraw Authority will be changed!"))
-         console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
-         console.log("Current Withdrawer " + chalk.blue(this.wallet.publicKey.toBase58()))
-         console.log("New Withdrawer " + chalk.blue(vaultPDA.toBase58()))
-
-         const { yes } = await basicConfirm("Commit transaction to the blockchain?", false)
-
-         if (!yes) {
-            return this.multisig(ms)
-         }
-
-         const status = new Spinner("Receiving latest blockhash... ")
-         status.start()
-
-         const blockhash = await (await this.connection.getLatestBlockhash("confirmed")).blockhash
-         authorizeWithdraw.recentBlockhash = blockhash
-         authorizeWithdraw.sign(this.wallet.payer)
-
-         console.log(blockhash)
-         status.message("Sending transaction... ")
-
-         const vtx = new VersionedTransaction(authorizeWithdraw.compileMessage())
-
-         // simulating delay
-         await new Promise(resolve => setTimeout(resolve, 2500))
-         const signature = "foobarfoobar"
-         // const signature = await this.connection.sendTransaction(vtx)
-
-         console.log("done!")
-
-         status.stop()
-         console.log("Transaction sent! Signature: " + chalk.blue(signature))
-         console.log("Verify stake Account with Velas CLI")
-         console.log(
-            chalk.blue(
-               `velas stake-account --url ${
-                  this.connection.rpcEndpoint
-               } ${stakeAccountPub.toBase58()}`,
-            ),
-         )
-
-         await continueInq()
-
-         return this.multisig(ms)
-      } else if (assemble == DO_WITHDRAW_STAKE) {
-         const { authority } = await createTransactionInq()
-         const authorityBN = new BN(authority, 10)
-         const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId)
-
-         const stakeAccount = await askPublicAddress("Enter Stake account public key in base58:")
-         const stakeAccountPub = new PublicKey(stakeAccount.publicAddress)
-
-         const recipient = await askPublicAddress("Enter token Recipient public key in base58:")
-         const recipientPub = new PublicKey(recipient.publicAddress)
-
-         const amount = await askVlx()
-         const vlx = parseInt(amount.vlx)
-
-         const withdrawStake = StakeProgram.withdraw({
-            stakePubkey: stakeAccountPub,
-            lamports: vlx * LAMPORTS_PER_SOL,
-            authorizedPubkey: authorityPDA,
-            toPubkey: recipientPub,
-         })
-
-         console.log(chalk.yellowBright("Please, verify transaction details before proceed:"))
-         console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
-         console.log("Recipient Account: " + chalk.blue(recipientPub.toBase58()))
-         console.log("Amount of VLX: " + chalk.blue(Intl.NumberFormat("en-US").format(vlx)))
-
-         console.log(
-            "This will create a new multisig transaction for authority/signer " +
-               chalk.blue(authorityPDA.toBase58()),
-         )
-         const { yes } = await basicConfirm(`Create Stake Withdraw transaction?`, false)
-
-         if (yes) {
-            const status = new Spinner("Creating draft transaction... ")
-            status.start()
-            const tx = await this.api.createTransaction(ms.publicKey, parseInt(authority, 10))
-            console.log("done!")
-            status.message("Adding Withdraw instruction... ")
-            await this.api.addInstruction(tx.publicKey, withdrawStake.instructions[0])
-            console.log("done!")
-            status.message("Activating transaction... ")
-            await this.api.activate(tx.publicKey)
-            console.log("done!")
-            status.message("Approving transaction... ")
-            await this.api.approveTransaction(tx.publicKey)
-            console.log("done!")
-            status.stop()
-
-            console.log("Success! Transaction key: " + chalk.blue(tx.publicKey.toBase58()))
-            await continueInq()
-
-            const txs = await this.api.getTransactions(ms)
-            this.transactions(txs, ms)
-         }
-         this.multisig(ms)
-      } else if (assemble === ASSEMBLE_DRAFT_TX) {
+      if (assemble === ASSEMBLE_DRAFT_TX) {
          const { authority } = await createTransactionInq()
          const authorityBN = new BN(authority, 10)
          const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId)
