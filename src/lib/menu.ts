@@ -77,7 +77,7 @@ import {
 import CliWallet from "./wallet"
 import askPublicAddress from "./inq/askPublicAddress"
 import askVlx from "./inq/askVlx"
-import { parseStakeAccount } from "./stake"
+import { StakeAccount, getStakeAccount, getStakeAccountsByWithdrawer } from "./stake"
 
 const Spinner = CLI.Spinner
 
@@ -179,16 +179,73 @@ class Menu {
       } catch (error) {
          spinner.stop()
          console.log(error)
-         console.log("Try restarting the cli using a different Solana cluster")
+         console.log("Try restarting the cli using a different Velas cluster")
          await continueInq()
          this.top()
       }
    }
 
    stake = async (ms: MultisigAccount) => {
+      /**
+       * Convets parsed Stake Accounts into displayable
+       * table, and inquirer accounts selection choices group
+       */
+      function intoTuiElements(accounts: StakeAccount[]): { prettyTable: any[], promptChoices: any[] } {
+         let prettyTable: any[] = []
+         let promptChoices: any[] = []
+
+         for (const acc of accounts) {
+            const vlx = acc.lamports / LAMPORTS_PER_SOL
+            const address = acc.address.toBase58()
+
+            let status: string
+            let withdrawer: string | undefined
+            let activatedStake: string = "No Stake"
+
+            switch (acc.data.kind) {
+               case "uninitialized":
+                  status = "Uninitialized"
+                  break
+               case "rewardsPool":
+                  status = "Rewards Pool"
+                  break
+               case "initialized":
+                  status = "Initialized"
+                  withdrawer = new PublicKey(acc.data.meta.authorized.withdrawer).toBase58()
+                  break
+               case "stake":
+                  status = "Delegated"
+                  let milliVlx = acc.data.stake.delegation.stake / BigInt(LAMPORTS_PER_SOL / 1000)
+                  activatedStake = Number(milliVlx) / 1000 + " VLX"
+                  withdrawer = new PublicKey(acc.data.meta.authorized.withdrawer).toBase58()
+                  break
+            }
+
+            prettyTable.push({
+               Address: address,
+               Balance: vlx,
+               Status: status,
+               "Activated Stake": activatedStake,
+               Withdrawer: withdrawer || "Not Available",
+            })
+
+            if (withdrawer) {
+               promptChoices.push({
+                  name: `${address} (${activatedStake})`,
+                  value: address,
+               })
+            }
+         }
+
+         return { prettyTable, promptChoices }
+      }
+
       const AUTH_WITHDRAW_STAKE = "Transfer Stake Withdraw Authority"
       const DO_WITHDRAW_STAKE = "Create Stake Withdraw transaction"
       const GO_BACK = "<- Go back"
+
+      const STAKE_AUTH_IDX = 1
+
       const { stake } = await inquirer.prompt({
          default: "",
          name: "stake",
@@ -202,158 +259,134 @@ class Menu {
       })
 
       if (stake === AUTH_WITHDRAW_STAKE) {
-         const [vaultPDA] = await getAuthorityPDA(ms.publicKey, new BN(1), this.api.programId)
+         const [vaultPDA] = await getAuthorityPDA(ms.publicKey, new BN(STAKE_AUTH_IDX), this.api.programId)
 
          const status = new Spinner("Searching Stake Accounts...")
          status.start()
 
-         const WITHDRAW_AUTHORITY_OFFSET = 0xC
-         const stakeAccounts = await this.connection.getProgramAccounts(StakeProgram.programId, {
-            filters: [{
-               memcmp: {
-                  offset: WITHDRAW_AUTHORITY_OFFSET,
-                  bytes: this.wallet.publicKey.toBase58(),
-                },
-            }], 
-            commitment: 'processed' 
-         })
+         const stakeAccounts = await getStakeAccountsByWithdrawer(this.connection, this.wallet.publicKey)
 
          status.stop()
 
          if (stakeAccounts.length == 0) {
-            console.log("Can't find any Stake Accounts for " + this.wallet.publicKey.toBase58() + " withdraw authority")
+            console.log("\nCan't find any Stake Accounts for " + this.wallet.publicKey.toBase58() + " withdraw authority\n")
             await continueInq()
             return this.stake(ms)
-         } else {
-            console.log("\nFound " + stakeAccounts.length + " Stake Account(s):\n")
-
-            let prettyTable: any[] = []
-            let promptChoices: any[] = []
-            for (const acc of stakeAccounts) {
-               const parsed = parseStakeAccount(acc.account.data)
-               
-               const vlx = acc.account.lamports / LAMPORTS_PER_SOL
-               const address = acc.pubkey.toBase58()
-
-               let status: string
-               let withdrawer: string
-               let activatedStake: string
-
-               switch (parsed.kind) {
-                  case "uninitialized":
-                  case "rewardsPool":
-                     throw new Error("Bug: these variants should not be filtered")
-                  case "initialized":
-                     status = "Initialized"
-                     activatedStake = "Not Activated"
-                     withdrawer = new PublicKey(parsed.meta.authorized.withdrawer).toBase58()
-                     break;
-                  case "stake":
-                     status = "Delegated"
-                     let milliVlx = parsed.stake.delegation.stake / BigInt(LAMPORTS_PER_SOL / 1000)
-                     activatedStake = Number(milliVlx) / 1000 + " VLX"
-                     withdrawer = new PublicKey(parsed.meta.authorized.withdrawer).toBase58()
-                     break;
-               }
-
-               prettyTable.push({
-                  Address: address,
-                  Balance: vlx,
-                  Status: status,
-                  "Activated Stake": activatedStake,
-                  Withdrawer: withdrawer,
-               })
-
-               promptChoices.push({
-                  name: `${address} (${activatedStake})`,
-                  value: address,
-               })
-            }
-
-            promptChoices.push({
-               name: GO_BACK,
-               value: GO_BACK
-            })
-
-            console.table(prettyTable)
-
-            const { stakeToAuthorize } = await inquirer.prompt({
-               name: 'stakeToAuthorize',
-               type: 'list',
-               choices: promptChoices,
-               message: "Select Stake Account to change Withdraw Authority:"
-            })
-
-            if (stakeToAuthorize === GO_BACK) {
-               console.log()
-               return this.multisig(ms)
-            }
-
-            const stakeAccountPub = new PublicKey(stakeToAuthorize)
-
-            let authorizeWithdraw = StakeProgram.authorize({
-               authorizedPubkey: this.wallet.publicKey,
-               newAuthorizedPubkey: vaultPDA,
-               stakePubkey: stakeAccountPub,
-               stakeAuthorizationType: { index: 1 }, // 1 == withdraw
-            })
-   
-            console.log()
-            console.log(chalk.yellowBright("WARNING! Withdraw Authority will be changed!"))
-            console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
-            console.log("Current Withdrawer " + chalk.blue(this.wallet.publicKey.toBase58()))
-            console.log("New Withdrawer " + chalk.blue(vaultPDA.toBase58()))
-
-            const { yes } = await basicConfirm("Proceed?", false)
-
-            if (!yes) {
-               return this.stake(ms)
-            }
-
-            status.message("Receiving latest blockhash... ")
-            status.start()
-   
-            const blockhash = await (await this.connection.getLatestBlockhash("confirmed")).blockhash
-            authorizeWithdraw.recentBlockhash = blockhash
-            authorizeWithdraw.sign(this.wallet.payer)
-   
-            console.log(blockhash)
-            status.message("Sending transaction... ")
-   
-            const vtx = new VersionedTransaction(authorizeWithdraw.compileMessage())
-   
-            // simulating delay
-            await new Promise(resolve => setTimeout(resolve, 2500))
-            const signature = "foobarfoobar"
-            // const signature = await this.connection.sendTransaction(vtx)
-   
-            console.log("done!")
-   
-            status.stop()
-            console.log("Transaction sent! Signature: " + chalk.blue(signature))
-
-            // TODO: display info directly
-            console.log("Verify stake Account with Velas CLI")
-            console.log(
-               chalk.blue(
-                  `velas stake-account --url ${
-                     this.connection.rpcEndpoint
-                  } ${stakeAccountPub.toBase58()}`,
-               ),
-            )
-   
-            await continueInq()
-            this.stake(ms)
          }
+
+         console.log()
+         console.log(chalk.green("Found " + stakeAccounts.length + " Stake Account(s):"))
+
+         let currentStakeAccs = intoTuiElements(stakeAccounts)
+
+         console.table(currentStakeAccs.prettyTable)
+
+         const { stakeToAuthorize } = await inquirer.prompt({
+            name: 'stakeToAuthorize',
+            type: 'list',
+            choices: [...currentStakeAccs.promptChoices, { name: GO_BACK, value: GO_BACK }],
+            message: "Select Stake Account to change Withdraw Authority:"
+         })
+
+         if (stakeToAuthorize === GO_BACK) {
+            console.log()
+            return this.multisig(ms)
+         }
+
+         const stakeAccountPub = new PublicKey(stakeToAuthorize)
+
+         let authorizeWithdraw = StakeProgram.authorize({
+            authorizedPubkey: this.wallet.publicKey,
+            newAuthorizedPubkey: vaultPDA,
+            stakePubkey: stakeAccountPub,
+            stakeAuthorizationType: { index: 1 }, // 1 == withdraw
+         })
+
+         console.log("\n" + chalk.yellowBright("WARNING! Withdraw Authority will be changed!"))
+         console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
+         console.log("Current Withdrawer " + chalk.blue(this.wallet.publicKey.toBase58()))
+         console.log("New Withdrawer " + chalk.blue(vaultPDA.toBase58()) + "\n")
+
+         const { yes } = await basicConfirm("Proceed?", false)
+
+         if (!yes) {
+            console.log()
+            return this.stake(ms)
+         }
+
+         status.message("Receiving latest blockhash... ")
+         status.start()
+
+         const blockhash = await (await this.connection.getLatestBlockhash("recent")).blockhash
+         authorizeWithdraw.recentBlockhash = blockhash
+         authorizeWithdraw.sign(this.wallet.payer)
+
+         console.log(blockhash)
+         status.message("Sending transaction... ")
+
+         const signature = await this.connection.sendRawTransaction(
+            authorizeWithdraw.serialize(), 
+            {
+               preflightCommitment: "confirmed",
+               skipPreflight: true
+            }
+         )
+
+         console.log("done!")
+
+         console.log("\nTransaction sent! Signature: " + chalk.blue(signature) + "\n")
+
+         status.message("Fetching Stake Account details...")
+         await new Promise(resolve => setTimeout(resolve, 4000)) // fix it?
+         const updatedStakeAcc = intoTuiElements([
+            await getStakeAccount(this.connection, stakeAccountPub, "processed")
+         ])
+         status.stop()
+
+         console.table(updatedStakeAcc.prettyTable)
+
+         await continueInq()
+         console.log("\n")
+         this.stake(ms)
       } else if (stake == DO_WITHDRAW_STAKE) {
-         const { authority } = await createTransactionInq()
-         const authorityBN = new BN(authority, 10)
-         const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId)
+         const status = new Spinner("Searching authorized Stake Accounts...")
+         status.start()
 
-         const stakeAccount = await askPublicAddress("Enter Stake account public key in base58:")
-         const stakeAccountPub = new PublicKey(stakeAccount.publicAddress)
+         const [vaultPDA] = await getAuthorityPDA(ms.publicKey, new BN(STAKE_AUTH_IDX), this.api.programId)
 
-         const recipient = await askPublicAddress("Enter token Recipient public key in base58:")
+         const authedStakes = await getStakeAccountsByWithdrawer(this.connection, vaultPDA)
+         const { prettyTable, promptChoices } = intoTuiElements(authedStakes)
+
+         status.stop()
+
+         if (authedStakes.length == 0) {
+            console.log(
+               "\nCan't find any Stake Accounts for " + 
+               chalk.blue(vaultPDA.toBase58()) + 
+               " Withdraw Authority\n"
+            )
+            await continueInq()
+            return this.stake(ms)
+         }
+
+         console.log()
+         console.log(chalk.green("Found " + authedStakes.length + " Stake Account(s):"))
+         console.table(prettyTable)
+         
+         const { stakeToWithdraw } = await inquirer.prompt({
+            name: 'stakeToWithdraw',
+            type: 'list',
+            choices: [...promptChoices, { name: GO_BACK, value: GO_BACK }],
+            message: "Select Stake Account to create Stake Withdraw transaction:"
+         })
+
+         if (stakeToWithdraw === GO_BACK) {
+            return this.stake(ms)
+         }
+
+         const stakeAccountPub = new PublicKey(stakeToWithdraw)
+
+         const recipient = await askPublicAddress("Enter token's Recipient Public Key in base58:")
          const recipientPub = new PublicKey(recipient.publicAddress)
 
          const amount = await askVlx()
@@ -362,7 +395,7 @@ class Menu {
          const withdrawStake = StakeProgram.withdraw({
             stakePubkey: stakeAccountPub,
             lamports: vlx * LAMPORTS_PER_SOL,
-            authorizedPubkey: authorityPDA,
+            authorizedPubkey: vaultPDA,
             toPubkey: recipientPub,
          })
 
@@ -373,17 +406,17 @@ class Menu {
 
          console.log(
             "This will create a new multisig transaction for authority/signer " +
-               chalk.blue(authorityPDA.toBase58()),
+               chalk.blue(vaultPDA.toBase58()),
          )
          const { yes } = await basicConfirm(`Create Stake Withdraw transaction?`, false)
 
          if (!yes) {
-            return this.multisig(ms)
+            return this.stake(ms)
          }
 
-         const status = new Spinner("Creating draft transaction... ")
+         status.message("Creating draft transaction... ")
          status.start()
-         const tx = await this.api.createTransaction(ms.publicKey, parseInt(authority, 10))
+         const tx = await this.api.createTransaction(ms.publicKey, STAKE_AUTH_IDX)
          console.log("done!")
          status.message("Adding Withdraw instruction... ")
          await this.api.addInstruction(tx.publicKey, withdrawStake.instructions[0])
@@ -400,7 +433,7 @@ class Menu {
          await continueInq()
 
          const txs = await this.api.getTransactions(ms)
-         this.transactions(txs, ms)
+         this.stake(ms)
       } else {
          this.multisig(ms)
       }
@@ -595,7 +628,7 @@ class Menu {
          )
       }
       console.log("View on the web:")
-      console.log(chalk.yellow("https://explorer.solana.com/address/" + tx.publicKey.toBase58()))
+      console.log(chalk.yellow("https://native.velas.com/address/" + tx.publicKey.toBase58()))
       console.log("")
 
       const { action } = await transactionPrompt(tx)

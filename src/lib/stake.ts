@@ -1,12 +1,54 @@
+import { Commitment, Connection, GetProgramAccountsResponse, PublicKey, StakeProgram } from "@solana/web3.js"
 import { deserialize } from "borsh-neu"
 import { StructType } from "borsh-neu/lib/types/types"
 
+export interface StakeAccount {
+   address: PublicKey,
+   executable: boolean,
+   lamports: number,
+   rentEpoch?: number,
+   data: StakeData
+}
+
+export async function getStakeAccountsByWithdrawer(conn: Connection, withdrawer: PublicKey, commitment?: Commitment): Promise<StakeAccount[]> {
+   const WITHDRAW_AUTHORITY_OFFSET = 0x2C
+   const rawStakeAccounts = await conn.getProgramAccounts(StakeProgram.programId, {
+      filters: [{
+         memcmp: {
+            offset: WITHDRAW_AUTHORITY_OFFSET,
+            bytes: withdrawer.toBase58(),
+         },
+      }], 
+      commitment
+   })
+
+   return rawStakeAccounts.map(raw => ({
+      address: raw.pubkey,
+      lamports: raw.account.lamports,
+      executable: raw.account.executable,
+      rentEpoch: raw.account.rentEpoch,
+      data: parseStakeAccountData(raw.account.data)
+   }))
+}
+
+export async function getStakeAccount(conn: Connection, address: PublicKey, commitment?: Commitment): Promise<StakeAccount> {
+   const account = await conn.getAccountInfo(address, commitment)
+   
+   return {
+      address,
+      lamports: account!.lamports,
+      executable: account!.executable,
+      rentEpoch: account!.rentEpoch,
+      data: parseStakeAccountData(account!.data)
+   }
+}
+
 /**
- * Parse raw bytes of Stake Account into structured object
- * @param stakeAccountData raw Stake Account datab
+ * Parse raw bytes of Stake Account Data into structured object
+ * @param stakeAccountData raw Stake Account data
  * @throws if met unknown enum variant ID or unexpected end of buffer
  */
-export function parseStakeAccount(stakeAccountData: Buffer): StakeAccount {
+export function parseStakeAccountData(stakeAccountData: Buffer): StakeData {
    const variant = stakeAccountData.readUint8()
 
    switch (variant) {
@@ -33,23 +75,24 @@ export function parseStakeAccount(stakeAccountData: Buffer): StakeAccount {
    }
 }
 
-type StakeAccount = Uninitialized | Initialized | Delegated | RewardsPool
+type StakeData = Uninitialized | Initialized | Delegated | RewardsPool
 
 interface Uninitialized {
-   kind: "uninitialized"
+   kind: "uninitialized",
 }
 
 interface Initialized {
    kind: "initialized",
-   meta: Meta
+   meta: Meta,
 }
 interface Delegated {
    kind: "stake",
    meta: Meta,
-   stake: Stake
+   stake: Stake,
 }
+
 interface RewardsPool {
-   kind: "rewardsPool"
+   kind: "rewardsPool",
 }
 
 interface Meta {
@@ -80,13 +123,13 @@ interface Delegation {
 
 interface Authorized {
    staker: Array<32>,
-   withdrawer: Array<32>
+   withdrawer: Array<32>,
 }
 
 interface Lockup {
    unixTimestamp: bigint,
    epoch: bigint,
-   custodian: Array<32>
+   custodian: Array<32>,
 }
 
 const META_SCHEMA: StructType = {
