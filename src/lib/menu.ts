@@ -386,10 +386,10 @@ class Menu {
 
          const stakeAccountPub = new PublicKey(stakeToWithdraw)
 
-         const recipient = await askPublicAddress("Enter token's Recipient Public Key in base58:")
+         const recipient = await askPublicAddress("Enter Public Key of Token Recipient in base58:")
          const recipientPub = new PublicKey(recipient.publicAddress)
 
-         const amount = await askVlx()
+         const amount = await askVlx("Enter VLX amount to withdraw from Stake Account:")
          const vlx = parseInt(amount.vlx)
 
          console.log(chalk.yellowBright("Please, verify transaction details before proceed:"))
@@ -484,7 +484,7 @@ class Menu {
 
    createTransaction = async (ms: MultisigAccount) => {
       // TODO: create simple transfer
-      const TRANSFER_TX = "Create transfer transaction"
+      const TRANSFER_TX = "Create Transfer Transaction"
       const ENTER_RAW_TX = "Create Arbitraty Transaction (base58 serialized message)"
       const ASSEMBLE_DRAFT_TX = "Assemble Transaction (create draft)"
       const GO_BACK = "<- Go back"
@@ -506,13 +506,16 @@ class Menu {
          const authorityBN = new BN(authority, 10)
          const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId)
 
-         console.log("This is simple transaction stub...")
+         const recipient = await askPublicAddress("Enter Public Key of Token Recipient in base58:")
+         const recipientPub = new PublicKey(recipient.publicAddress)
 
-         // TODO
-         // 1. Ask user for `toPubkey`
-         // 2. Ask user for `lamports`
+         const amount = await askVlx("Enter VLX amount to Transfer:")
+         const vlx = parseInt(amount.vlx)
 
-         // await this.api.createSimpleTransaction(ms.publicKey, authorityPDA, vlx)
+         console.log(recipientPub.toBase58())
+         console.log(vlx)
+
+         await this.api.createSimpleTransaction(ms.publicKey, authorityPDA, recipientPub, vlx)
 
          await continueInq()
          this.multisig(ms)
