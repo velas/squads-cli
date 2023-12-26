@@ -15,8 +15,8 @@ import {
    LAMPORTS_PER_SOL,
    PublicKey,
    StakeProgram,
+   SystemProgram,
    Transaction,
-   VersionedTransaction,
 } from "@solana/web3.js"
 import {
    mainMenu,
@@ -337,7 +337,7 @@ class Menu {
          console.log("\nTransaction sent! Signature: " + chalk.blue(signature) + "\n")
 
          status.message("Fetching Stake Account details...")
-         await new Promise(resolve => setTimeout(resolve, 4000)) // fix it?
+         await this.connection.confirmTransaction(signature, "confirmed")
          const updatedStakeAcc = intoTuiElements([
             await getStakeAccount(this.connection, stakeAccountPub, "processed")
          ])
@@ -392,13 +392,6 @@ class Menu {
          const amount = await askVlx()
          const vlx = parseInt(amount.vlx)
 
-         const withdrawStake = StakeProgram.withdraw({
-            stakePubkey: stakeAccountPub,
-            lamports: vlx * LAMPORTS_PER_SOL,
-            authorizedPubkey: vaultPDA,
-            toPubkey: recipientPub,
-         })
-
          console.log(chalk.yellowBright("Please, verify transaction details before proceed:"))
          console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
          console.log("Recipient Account: " + chalk.blue(recipientPub.toBase58()))
@@ -416,20 +409,9 @@ class Menu {
 
          status.message("Creating draft transaction... ")
          status.start()
-         const tx = await this.api.createTransaction(ms.publicKey, STAKE_AUTH_IDX)
-         console.log("done!")
-         status.message("Adding Withdraw instruction... ")
-         await this.api.addInstruction(tx.publicKey, withdrawStake.instructions[0])
-         console.log("done!")
-         status.message("Activating transaction... ")
-         await this.api.activate(tx.publicKey)
-         console.log("done!")
-         status.message("Approving transaction... ")
-         await this.api.approveTransaction(tx.publicKey)
-         console.log("done!")
+         const txPda = await this.api.createWithdrawStakeTx(ms.publicKey, stakeAccountPub, vaultPDA, recipientPub, vlx)
          status.stop()
 
-         console.log("Success! Transaction key: " + chalk.blue(tx.publicKey.toBase58()))
          await continueInq()
 
          const txs = await this.api.getTransactions(ms)
@@ -502,6 +484,7 @@ class Menu {
 
    createTransaction = async (ms: MultisigAccount) => {
       // TODO: create simple transfer
+      const TRANSFER_TX = "Create transfer transaction"
       const ENTER_RAW_TX = "Create Arbitraty Transaction (base58 serialized message)"
       const ASSEMBLE_DRAFT_TX = "Assemble Transaction (create draft)"
       const GO_BACK = "<- Go back"
@@ -510,6 +493,7 @@ class Menu {
          name: "assemble",
          type: "list",
          choices: [
+            TRANSFER_TX,
             ENTER_RAW_TX,
             ASSEMBLE_DRAFT_TX,
             GO_BACK,
@@ -517,7 +501,22 @@ class Menu {
          message: "How do you want to create the transaction?",
       })
 
-      if (assemble === ASSEMBLE_DRAFT_TX) {
+      if (assemble == TRANSFER_TX) {
+         const { authority } = await createTransactionInq()
+         const authorityBN = new BN(authority, 10)
+         const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId)
+
+         console.log("This is simple transaction stub...")
+
+         // TODO
+         // 1. Ask user for `toPubkey`
+         // 2. Ask user for `lamports`
+
+         // await this.api.createSimpleTransaction(ms.publicKey, authorityPDA, vlx)
+
+         await continueInq()
+         this.multisig(ms)
+      } else if (assemble === ASSEMBLE_DRAFT_TX) {
          const { authority } = await createTransactionInq()
          const authorityBN = new BN(authority, 10)
          const [authorityPDA] = await getAuthorityPDA(ms.publicKey, authorityBN, this.api.programId)

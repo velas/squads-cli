@@ -11,7 +11,7 @@ import idl from "../squads_mpl.json"
 import { ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token"
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token"
 import { Program, ProgramAccount, Wallet } from "@coral-xyz/anchor"
-import { Connection, LAMPORTS_PER_SOL, PublicKey, VoteProgram } from "@solana/web3.js"
+import { Connection, LAMPORTS_PER_SOL, PublicKey, StakeProgram, SystemProgram, VoteProgram } from "@solana/web3.js"
 
 class API {
    squads: Squads
@@ -156,6 +156,86 @@ class API {
       }).instructions[0]
 
       const addIx = await this.squads.buildAddInstruction(msPDA, txPDA, authorizeIx, 1)
+      const activateIx = await this.squads.buildActivateTransaction(msPDA, txPDA)
+      const approveIx = await this.squads.buildApproveTransaction(msPDA, txPDA)
+
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash()
+      let tx = new anchor.web3.Transaction({
+         blockhash,
+         lastValidBlockHeight,
+         feePayer: this.wallet.publicKey,
+      })
+      tx.add(createTxIx)
+      tx.add(addIx)
+      tx.add(activateIx)
+      tx.add(approveIx)
+      console.log("Transaction composed")
+      tx = await this.wallet.signTransaction(tx)
+      console.log("Transaction signed")
+      console.log("Sending")
+      const sig = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
+      await this.connection.confirmTransaction(sig, "confirmed")
+      console.log("Transaction sent")
+      return txPDA
+   }
+
+   createSimpleTransaction = async (
+      msPDA: PublicKey,
+      sender: PublicKey,
+      receiver: PublicKey,
+      vlx: number,
+   ): Promise<PublicKey> => {
+      const nextTxIndex = await this.squads.getNextTransactionIndex(msPDA)
+      const [txPDA] = await getTxPDA(msPDA, new BN(nextTxIndex), this.programId)
+      const createTxIx = await this.squads.buildCreateTransaction(msPDA, 1, nextTxIndex)
+      const ix = SystemProgram.transfer({
+         fromPubkey: sender,
+         toPubkey: receiver,
+         lamports: vlx * LAMPORTS_PER_SOL
+      })
+
+      const addIx = await this.squads.buildAddInstruction(msPDA, txPDA, ix, 1)
+      const activateIx = await this.squads.buildActivateTransaction(msPDA, txPDA)
+      const approveIx = await this.squads.buildApproveTransaction(msPDA, txPDA)
+
+      const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash()
+      let tx = new anchor.web3.Transaction({
+         blockhash,
+         lastValidBlockHeight,
+         feePayer: this.wallet.publicKey,
+      })
+      tx.add(createTxIx)
+      tx.add(addIx)
+      tx.add(activateIx)
+      tx.add(approveIx)
+      console.log("Transaction composed")
+      tx = await this.wallet.signTransaction(tx)
+      console.log("Transaction signed")
+      console.log("Sending")
+      const sig = await this.connection.sendRawTransaction(tx.serialize(), { skipPreflight: true })
+      await this.connection.confirmTransaction(sig, "confirmed")
+      console.log("Transaction sent")
+      return txPDA
+   }
+
+   createWithdrawStakeTx = async (
+      msPDA: PublicKey,
+      stakeAccount: PublicKey,
+      withdrawer: PublicKey,
+      receiver: PublicKey,
+      vlx: number,
+   ): Promise<PublicKey> => {
+      const nextTxIndex = await this.squads.getNextTransactionIndex(msPDA)
+      const [txPDA] = await getTxPDA(msPDA, new BN(nextTxIndex), this.programId)
+      const createTxIx = await this.squads.buildCreateTransaction(msPDA, 1, nextTxIndex)
+      const ix = StakeProgram.withdraw({
+         stakePubkey: stakeAccount,
+         lamports: vlx * LAMPORTS_PER_SOL,
+         authorizedPubkey: withdrawer,
+         toPubkey: receiver,
+      }).instructions[0]
+
+      const addIx = await this.squads.buildAddInstruction(msPDA, txPDA, ix, 1)
       const activateIx = await this.squads.buildActivateTransaction(msPDA, txPDA)
       const approveIx = await this.squads.buildApproveTransaction(msPDA, txPDA)
 

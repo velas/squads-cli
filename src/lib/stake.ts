@@ -1,4 +1,4 @@
-import { Commitment, Connection, GetProgramAccountsResponse, PublicKey, StakeProgram } from "@solana/web3.js"
+import { Commitment, Connection, PublicKey, StakeProgram } from "@solana/web3.js"
 import { deserialize } from "borsh-neu"
 import { StructType } from "borsh-neu/lib/types/types"
 
