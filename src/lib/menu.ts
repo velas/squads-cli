@@ -622,6 +622,13 @@ class Menu {
          },
       ]
       console.table(txData)
+
+
+
+      
+      const ixData = await this.api.getInstructions(tx.publicKey, tx.instructionIndex)
+      console.table(ixData)
+
       if (tx.status.active) {
          console.log(
             chalk.red(

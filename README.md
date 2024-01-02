@@ -29,3 +29,14 @@ Running the simple command will start the tool and ask a few setup questions for
 
 Providing the cluster will bypass the question upon startup\
 `squads-cli --cluster https://api.mainnet.velas.com`
+
+### Future 
+
+1. VLX Amount with float
+
+2. Get instruction data
+2.1 get ix pda in transaction (api.getInstructions(txPda))
+2.2 get account from blockchain by ixpda (squads.getInstruction(ixPda))
+2.3 get decoder by instruction.programID (system | stake): decoder is `fn(bytes) -> JSON`
+2.4 use decoder(instruction.data) to get json of instruction
+2.5 print json as table
