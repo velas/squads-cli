@@ -61,7 +61,7 @@ class API {
       return Promise.all(mySquads.map(k => this.getSquadExtended(k)))
    }
 
-   getChainSquads = async (pubkey: PublicKey) => {}
+   getChainSquads = async (pubkey: PublicKey) => { }
 
    getTransactions = async (ms: any) => {
       const txIndex = ms.transactionIndex
@@ -80,7 +80,11 @@ class API {
          [...new Array(ixCount)].map(async (_, i) => {
             const ind = new BN(i + 1)
             const [ixPDA] = await getIxPDA(txPDA, ind, this.programId)
-            return ixPDA.toBase58()
+            const ixData = await this.squads.getInstruction(ixPDA)
+            return {
+               ixPDA: ixPDA,
+               info: ixData
+            }
          }),
       )
       return instructions
