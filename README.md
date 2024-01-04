@@ -40,3 +40,6 @@ Providing the cluster will bypass the question upon startup\
 2.3 get decoder by instruction.programID (system | stake): decoder is `fn(bytes) -> JSON`
 2.4 use decoder(instruction.data) to get json of instruction
 2.5 print json as table
+
+3. Stake: list accounts
+4. Create transaction -> Show TxPDA

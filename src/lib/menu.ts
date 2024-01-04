@@ -412,6 +412,7 @@ class Menu {
          status.message("Creating draft transaction... ")
          status.start()
          const txPda = await this.api.createWithdrawStakeTx(ms.publicKey, stakeAccountPub, vaultPDA, recipientPub, vlx)
+         console.log("Transaction key: " + chalk.blue(txPda.toBase58()))
          status.stop()
 
          await continueInq()
@@ -584,7 +585,7 @@ class Menu {
                   await this.api.activate(tx.publicKey)
                   await this.api.approveTransaction(tx.publicKey)
                   console.log("Transaction created!")
-                  // console.log("Transaction key: " + chalk.blue(tx.publicKey.toBase58()));
+                  console.log("Transaction key: " + chalk.blue(tx.publicKey.toBase58()));
                   await continueInq()
                   const txs = await this.api.getTransactions(ms)
                   this.transactions(txs, ms)
