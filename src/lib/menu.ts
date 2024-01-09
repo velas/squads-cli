@@ -78,6 +78,8 @@ import CliWallet from "./wallet"
 import askPublicAddress from "./inq/askPublicAddress"
 import askVlx from "./inq/askVlx"
 import { StakeAccount, getStakeAccount, getStakeAccountsByWithdrawer } from "./stake"
+import { getInstructionProgram, getInstructionDecoder } from "./program"
+import { get } from "http"
 
 const Spinner = CLI.Spinner
 
@@ -130,10 +132,10 @@ class Menu {
       )
       console.log(
          chalk.blue("Connected wallet: ") +
-            chalk.white(this.wallet.publicKey.toBase58()) +
-            (this.walletBalance > 0
-               ? chalk.blue(" (") + chalk.white(this.walletBalance) + chalk.blue(" VLX)")
-               : ""),
+         chalk.white(this.wallet.publicKey.toBase58()) +
+         (this.walletBalance > 0
+            ? chalk.blue(" (") + chalk.white(this.walletBalance) + chalk.blue(" VLX)")
+            : ""),
       )
       if (vault) {
          try {
@@ -325,7 +327,7 @@ class Menu {
          status.message("Sending transaction... ")
 
          const signature = await this.connection.sendRawTransaction(
-            authorizeWithdraw.serialize(), 
+            authorizeWithdraw.serialize(),
             {
                preflightCommitment: "confirmed",
                skipPreflight: true
@@ -361,8 +363,8 @@ class Menu {
 
          if (authedStakes.length == 0) {
             console.log(
-               "\nCan't find any Stake Accounts for " + 
-               chalk.blue(vaultPDA.toBase58()) + 
+               "\nCan't find any Stake Accounts for " +
+               chalk.blue(vaultPDA.toBase58()) +
                " Withdraw Authority\n"
             )
             await continueInq()
@@ -372,7 +374,7 @@ class Menu {
          console.log()
          console.log(chalk.green("Found " + authedStakes.length + " Stake Account(s):"))
          console.table(prettyTable)
-         
+
          const { stakeToWithdraw } = await inquirer.prompt({
             name: 'stakeToWithdraw',
             type: 'list',
@@ -399,7 +401,7 @@ class Menu {
 
          console.log(
             "This will create a new multisig transaction for authority/signer " +
-               chalk.blue(vaultPDA.toBase58()),
+            chalk.blue(vaultPDA.toBase58()),
          )
          const { yes } = await basicConfirm(`Create Stake Withdraw transaction?`, false)
 
@@ -410,6 +412,7 @@ class Menu {
          status.message("Creating draft transaction... ")
          status.start()
          const txPda = await this.api.createWithdrawStakeTx(ms.publicKey, stakeAccountPub, vaultPDA, recipientPub, vlx)
+         console.log("Transaction key: " + chalk.blue(txPda.toBase58()))
          status.stop()
 
          await continueInq()
@@ -428,8 +431,8 @@ class Menu {
       console.log("-----------------------------------------------------------")
       console.log(
          "(" +
-            chalk.red("DO NOT") +
-            " send assets to this address. Use ONLY vault address shown above)",
+         chalk.red("DO NOT") +
+         " send assets to this address. Use ONLY vault address shown above)",
       )
       console.log("Multisig account: " + chalk.white(ms.publicKey.toBase58()))
       console.log(" ")
@@ -527,7 +530,7 @@ class Menu {
          const status = new Spinner("Creating transaction...")
          console.log(
             "This will create a new transaction draft for authority " +
-               chalk.blue(authorityPDA.toBase58()),
+            chalk.blue(authorityPDA.toBase58()),
          )
          const { yes } = await basicConfirm("Continue?", false)
          if (yes) {
@@ -560,7 +563,7 @@ class Menu {
                const ixes = tx.instructions
                console.log(
                   "This will create a new multisig transaction for authority/signer " +
-                     chalk.blue(authorityPDA.toBase58()),
+                  chalk.blue(authorityPDA.toBase58()),
                )
                const { yes } = await basicConfirm(
                   `Create a transaction with ${ixes.length} instructions?`,
@@ -582,7 +585,7 @@ class Menu {
                   await this.api.activate(tx.publicKey)
                   await this.api.approveTransaction(tx.publicKey)
                   console.log("Transaction created!")
-                  // console.log("Transaction key: " + chalk.blue(tx.publicKey.toBase58()));
+                  console.log("Transaction key: " + chalk.blue(tx.publicKey.toBase58()));
                   await continueInq()
                   const txs = await this.api.getTransactions(ms)
                   this.transactions(txs, ms)
@@ -622,6 +625,23 @@ class Menu {
          },
       ]
       console.table(txData)
+
+
+      const ixs_keys = await this.api.getInstructions(tx.publicKey, tx.instructionIndex)
+      let ix_data = await Promise.all(
+         ixs_keys.map(async (ix_info) => {
+            const decoder = getInstructionDecoder(ix_info.info.programId);
+
+            return {
+               Program: getInstructionProgram(ix_info.info.programId),
+               Info: decoder(ix_info.info.data, ix_info.info.keys),
+            }
+         })
+      );
+      console.table(ix_data)
+      // console.log(ix_data)
+      // console.table(ixData)
+
       if (tx.status.active) {
          console.log(
             chalk.red(
@@ -1089,8 +1109,8 @@ class Menu {
       console.log(`Current Program Authority: ` + chalk.white(`${currentAuthority}`))
       console.log(
          `New Program Upgrade Authority: ` +
-            chalk.green(vault.toBase58()) +
-            chalk.white(` (Vault - authority index 1)`),
+         chalk.green(vault.toBase58()) +
+         chalk.white(` (Vault - authority index 1)`),
       )
       const { action } = await inquirer.prompt({
          default: false,
@@ -1140,8 +1160,8 @@ class Menu {
       console.log(`Current Program Authority: ` + chalk.white(`${currentAuthority}`))
       console.log(
          `New Program Upgrade Authority: ` +
-            chalk.green(this.wallet.publicKey.toBase58()) +
-            chalk.white(` (Your connected wallet)`),
+         chalk.green(this.wallet.publicKey.toBase58()) +
+         chalk.white(` (Your connected wallet)`),
       )
       const { action } = await inquirer.prompt({
          default: false,

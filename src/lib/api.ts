@@ -1,4 +1,4 @@
-import Squads, { getTxPDA, getAuthorityPDA, MultisigAccount } from "@sqds/sdk"
+import Squads, { getTxPDA, getIxPDA, getAuthorityPDA, MultisigAccount } from "@sqds/sdk"
 import * as anchor from "@coral-xyz/anchor"
 import BN from "bn.js"
 import { getProgramData, upgradeSetAuthorityIx } from "./program"
@@ -61,7 +61,7 @@ class API {
       return Promise.all(mySquads.map(k => this.getSquadExtended(k)))
    }
 
-   getChainSquads = async (pubkey: PublicKey) => {}
+   getChainSquads = async (pubkey: PublicKey) => { }
 
    getTransactions = async (ms: any) => {
       const txIndex = ms.transactionIndex
@@ -73,6 +73,21 @@ class API {
          }),
       )
       return transactions
+   }
+
+   getInstructions = async (txPDA: PublicKey, ixCount: number) => {
+      const instructions = await Promise.all(
+         [...new Array(ixCount)].map(async (_, i) => {
+            const ind = new BN(i + 1)
+            const [ixPDA] = await getIxPDA(txPDA, ind, this.programId)
+            const ixData = await this.squads.getInstruction(ixPDA)
+            return {
+               ixPDA: ixPDA,
+               info: ixData
+            }
+         }),
+      )
+      return instructions
    }
 
    createMultisig = async (threshold: number, createKey: PublicKey, members: PublicKey[]) => {

@@ -18,7 +18,7 @@ export async function getStakeAccountsByWithdrawer(conn: Connection, withdrawer:
             offset: WITHDRAW_AUTHORITY_OFFSET,
             bytes: withdrawer.toBase58(),
          },
-      }], 
+      }],
       commitment
    })
 
@@ -33,7 +33,7 @@ export async function getStakeAccountsByWithdrawer(conn: Connection, withdrawer:
 
 export async function getStakeAccount(conn: Connection, address: PublicKey, commitment?: Commitment): Promise<StakeAccount> {
    const account = await conn.getAccountInfo(address, commitment)
-   
+
    return {
       address,
       lamports: account!.lamports,
