@@ -392,12 +392,12 @@ class Menu {
          const recipientPub = new PublicKey(recipient.publicAddress)
 
          const amount = await askVlx("Enter VLX amount to withdraw from Stake Account:")
-         const vlx = parseInt(amount.vlx)
+         const vlx = parseFloat(amount.vlx)
 
          console.log(chalk.yellowBright("Please, verify transaction details before proceed:"))
          console.log("Stake Account: " + chalk.blue(stakeAccountPub.toBase58()))
          console.log("Recipient Account: " + chalk.blue(recipientPub.toBase58()))
-         console.log("Amount of VLX: " + chalk.blue(Intl.NumberFormat("en-US").format(vlx)))
+         console.log("Stake Withdraw amount of VLX: " + chalk.blue(Intl.NumberFormat("en-US").format(vlx)))
 
          console.log(
             "This will create a new multisig transaction for authority/signer " +
